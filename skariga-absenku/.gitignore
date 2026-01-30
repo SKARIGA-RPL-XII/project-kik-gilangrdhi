@@ -42,5 +42,7 @@ next-env.d.ts
 
 /app/generated/prisma
 
-~$*.docx
+# Word temp files
+~$*
 *.tmp
+
