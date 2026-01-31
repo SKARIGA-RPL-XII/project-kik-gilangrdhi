@@ -70,7 +70,7 @@ export default function AttendanceToolbar() {
   const currentSortOption = sortOptions.find(o => o.value === sort);
 
   return (
-    <div className="space-y-4 mb-6 z-50 relative">
+    <div className="space-y-4 mb-6 relative z-30"> 
       <div className="flex flex-col md:flex-row gap-3">
         <div className="relative flex-1 group">
           <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
@@ -92,22 +92,26 @@ export default function AttendanceToolbar() {
           <div className="relative group min-w-40">
             <input
               type="date"
-              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
               value={date}
               onChange={(e) => {
                 setDate(e.target.value);
                 updateParams("date", e.target.value);
               }}
+              onClick={(e) => e.currentTarget.showPicker?.()} 
             />
-            <div className={`flex items-center justify-between px-4 py-2.5 border rounded-xl text-sm font-medium transition-all shadow-sm cursor-pointer hover:shadow-md ${
+
+            <div className={`flex items-center justify-between px-4 py-2.5 border rounded-xl text-sm font-medium transition-all shadow-sm group-hover:shadow-md relative z-10 ${
               date 
                 ? "bg-linear-to-r from-orange-50 to-white border-orange-200 text-orange-700 ring-2 ring-orange-100" 
-                : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
+                : "bg-white border-gray-200 text-gray-600 group-hover:border-gray-300"
             }`}>
               <div className="flex items-center gap-2">
                 <CalendarIcon className={`w-4 h-4 ${date ? "text-orange-500" : "text-gray-400"}`} />
                 <span className="whitespace-nowrap">
-                  {date ? new Date(date).toLocaleDateString("id-ID", { day: '2-digit', month: 'short', year: 'numeric' }) : "Pilih Tanggal"}
+                  {date 
+                    ? new Date(date).toLocaleDateString("id-ID", { day: '2-digit', month: 'short', year: 'numeric' }) 
+                    : "Pilih Tanggal"}
                 </span>
               </div>
               <ChevronDown className="w-3 h-3 text-gray-300 ml-2" />
@@ -169,7 +173,6 @@ export default function AttendanceToolbar() {
             )}
           </div>
 
-          {/* 4. TOMBOL RESET */}
           {(searchTerm || date || sort !== "date_desc") && (
             <button
               onClick={handleReset}
