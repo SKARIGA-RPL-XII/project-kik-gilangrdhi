@@ -14,10 +14,22 @@ export default function Footer() {
         </h2>
 
         <div className="flex flex-wrap justify-center gap-8 text-gray-600 font-medium text-sm mb-10">
-          {["Tentang", "Kurikulum", "Siswa", "Prestasi", "Kerja Sama"].map((item) => (
-            <Link key={item} href="#" className="hover:text-sky-600 hover:scale-105 transition-all">
-              {item}
-            </Link>
+          {[
+            { name: "Tentang", href: "https://id.wikipedia.org/wiki/SMK_PGRI_3_Malang" },
+            { name: "Kurikulum", href: "https://kurikulum.kemendikdasmen.go.id/" },
+            { name: "Prestasi", href: "https://radarmalang.jawapos.com/pendidikan/816452960/smk-pgri-3-malang-sabet-emas-dan-perak-di-ajang-lks-tingkat-nasional-2025" },
+            { name: "Lowongan Kerja", href: "https://bki-skariga.web.id/loker/" },
+            { name: "Kerja Sama", href: "https://bki-skariga.web.id/kerjasama-industri/" }
+          ].map((item) => (
+            <a
+              key={item.name}
+              href={item.href}
+              target={item.href.startsWith('http') ? "_blank" : "_self"}
+              rel="noopener noreferrer"
+              className="hover:text-sky-600 hover:scale-105 transition-all"
+            >
+              {item.name}
+            </a>
           ))}
         </div>
 
