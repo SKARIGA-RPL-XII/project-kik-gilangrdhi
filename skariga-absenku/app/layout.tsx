@@ -1,7 +1,11 @@
+/* eslint-disable @next/next/no-page-custom-font */
+/* eslint-disable @next/next/google-font-display */
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Poppins } from "next/font/google";
+import { getServerSession } from "next-auth"; 
+import { authOptions } from "@/src/lib/authOptions";
 
 const poppins = Poppins({
   weight: ["300", "400", "500", "600", "700"],
@@ -14,11 +18,39 @@ export const metadata = {
   description: "Sistem Absensi Modern SMK PGRI 3 Malang",
 };
 
-export default function RootLayout({
+interface NavbarUser {
+  nama: string | null;
+  email: string | null;
+  role: string;
+}
+
+interface SessionUser {
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+  role?: string;
+}
+
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  
+  const session = await getServerSession(authOptions);
+  
+  let user: NavbarUser | null = null;
+  
+  if (session?.user) {
+    const sessionUser = session.user as SessionUser;
+
+    user = {
+      nama: sessionUser.name || null,
+      email: sessionUser.email || null,
+      role: sessionUser.role || "USER",
+    };
+  }
+
   return (
     <html lang="id">
       <head>
@@ -28,13 +60,14 @@ export default function RootLayout({
         />
       </head>
       <body className={`${poppins.className} bg-gray-50 text-gray-800`}>
-        <Navbar />
+        
+        {user && <Navbar user={user} />}
 
-        <main className="pt-20 min-h-screen">
+        <main className={user ? "pt-20 min-h-screen" : "min-h-screen"}>
           {children}
         </main>
 
-        <Footer />
+        {user && <Footer />}
       </body>
     </html>
   );
