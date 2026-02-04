@@ -1,12 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Building2, MapPin, Edit, Trash2, Save, Plus } from "lucide-react";
-import { Modal, Input, Button, Form, message, ConfigProvider } from "antd";
+import { Building2, MapPin, Edit, Trash2, Save, Plus, Clock } from "lucide-react"; 
+import { Modal, Input, Button, Form, message, ConfigProvider, TimePicker } from "antd"; 
 import dynamic from "next/dynamic";
 import { updateCompany, deleteCompany, createCompany } from "@/app/actions/company";
 import ConfirmDelete from "@/components/ConfirmDelete";
 import CompanyToolbar from "@/components/CompanyToolbar";
+import dayjs, { Dayjs } from "dayjs";
 
 const CompanyMap = dynamic(() => import("./CompanyMap"), { ssr: false });
 
@@ -18,6 +19,9 @@ interface Company {
   latitude: number;
   longitude: number;
   radius: number;
+  jam_masuk_kantor: string;
+  jam_pulang_kantor: string;
+  createdAt: Date;
 }
 
 interface CompanyFormValues {
@@ -25,6 +29,8 @@ interface CompanyFormValues {
   deskripsi?: string;
   alamat: string;
   radius: string | number;
+  jam_masuk: Dayjs; 
+  jam_pulang: Dayjs; 
 }
 
 export default function CompanyList({ companies }: { companies: Company[] }) {
@@ -50,6 +56,10 @@ export default function CompanyList({ companies }: { companies: Company[] }) {
     setTempLng(defaultLng);
     setTempRadius(100);
     form.resetFields();
+    form.setFieldsValue({
+        jam_masuk: dayjs('07:00', 'HH:mm'),
+        jam_pulang: dayjs('15:00', 'HH:mm'),
+    });
     setIsModalOpen(true);
   };
 
@@ -64,16 +74,22 @@ export default function CompanyList({ companies }: { companies: Company[] }) {
       deskripsi: company.deskripsi,
       alamat: company.alamat,
       radius: company.radius,
+      jam_masuk: dayjs(company.jam_masuk_kantor || '07:00', 'HH:mm'),
+      jam_pulang: dayjs(company.jam_pulang_kantor || '15:00', 'HH:mm'),
     });
     setIsModalOpen(true);
   };
 
   const onFinish = async (values: CompanyFormValues) => {
     const payload = {
-      ...values,
+      nama: values.nama,
+      deskripsi: values.deskripsi,
+      alamat: values.alamat,
       latitude: tempLat,
       longitude: tempLng,
       radius: Number(values.radius),
+      jam_masuk_kantor: values.jam_masuk.format('HH:mm'),
+      jam_pulang_kantor: values.jam_pulang.format('HH:mm'),
     };
 
     let res;
@@ -168,13 +184,20 @@ export default function CompanyList({ companies }: { companies: Company[] }) {
                 </div>
 
                 <div className="space-y-3">
+                   <div className="flex items-center gap-3 text-sm text-gray-600 bg-sky-50 p-2 rounded-lg border border-sky-100">
+                      <Clock className="w-4 h-4 text-sky-500 shrink-0" />
+                      <span className="font-medium">
+                        Jam Kerja: {company.jam_masuk_kantor || "07:00"} - {company.jam_pulang_kantor || "15:00"}
+                      </span>
+                   </div>
+
                   <div className="flex items-start gap-3 text-sm text-gray-600 bg-gray-50 p-3 rounded-xl border border-gray-100">
                     <MapPin className="w-5 h-5 text-red-400 mt-0.5 shrink-0" />
                     <div>
                       <span className="block font-medium text-gray-800 mb-1">Alamat Kantor</span>
                       {company.alamat || "Belum diatur"}
                       <div className="text-xs text-gray-400 mt-1 font-mono">
-                        {company.latitude.toFixed(6)}, {company.longitude.toFixed(6)} • Radius: {company.radius}m
+                        Radius: {company.radius}m
                       </div>
                     </div>
                   </div>
@@ -196,7 +219,7 @@ export default function CompanyList({ companies }: { companies: Company[] }) {
           width={700}
           centered
           styles={{ 
-            body: { maxHeight: '65vh', overflowY: 'auto', paddingRight: '10px' } 
+            body: { maxHeight: '75vh', overflowY: 'auto', paddingRight: '10px' } 
           }}
         >
           <Form form={form} layout="vertical" onFinish={onFinish} className="mt-4">
@@ -207,6 +230,15 @@ export default function CompanyList({ companies }: { companies: Company[] }) {
               <Form.Item name="radius" label="Radius Validasi (Meter)" rules={[{ required: true, message: 'Wajib diisi' }]}>
                 <Input type="number" size="large" onChange={(e) => setTempRadius(Number(e.target.value))} placeholder="100" />
               </Form.Item>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 bg-gray-50 p-4 rounded-xl border border-gray-200 mb-4">
+                <Form.Item name="jam_masuk" label="Jam Masuk" rules={[{ required: true }]} style={{marginBottom: 0}}>
+                    <TimePicker format="HH:mm" size="large" className="w-full" />
+                </Form.Item>
+                <Form.Item name="jam_pulang" label="Jam Pulang (Min)" rules={[{ required: true }]} style={{marginBottom: 0}}>
+                    <TimePicker format="HH:mm" size="large" className="w-full" />
+                </Form.Item>
             </div>
 
             <Form.Item name="deskripsi" label="Deskripsi Singkat">
@@ -220,7 +252,6 @@ export default function CompanyList({ companies }: { companies: Company[] }) {
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Titik Lokasi Kantor
-                <span className="text-xs font-normal text-gray-400 ml-2">(Geser peta / klik lokasi)</span>
               </label>
               
               <CompanyMap 
@@ -246,7 +277,7 @@ export default function CompanyList({ companies }: { companies: Company[] }) {
           onClose={() => setIsDeleteOpen(false)}
           onConfirm={handleConfirmDelete}
           title="Hapus Perusahaan?"
-          description="Tindakan ini tidak dapat dibatalkan. Data absensi dan user yang terkait dengan perusahaan ini mungkin akan mengalami error atau ikut terhapus."
+          description="Hati-hati! Data absensi user terkait akan ikut terhapus."
           isLoading={isDeleting}
         />
 

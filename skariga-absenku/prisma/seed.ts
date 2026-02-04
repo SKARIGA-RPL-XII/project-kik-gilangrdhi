@@ -4,19 +4,6 @@ import * as bcrypt from 'bcryptjs'
 
 const prisma = new PrismaClient()
 
-const activities = [
-  "Membuat tampilan Login menggunakan React dan Tailwind",
-  "Slicing UI halaman Dashboard Admin",
-  "Belajar integrasi API dengan Axios",
-  "Rapat evaluasi mingguan dengan pembimbing lapangan",
-  "Fixing bug pada fitur Absensi",
-  "Setup database PostgreSQL dan Prisma",
-  "Membuat dokumentasi API di Postman",
-  "Deploy aplikasi ke Vercel",
-  "Belajar State Management menggunakan Zustand",
-  "Istirahat dan sholat dzuhur"
-]
-
 async function main() {
   console.log('🌱 Mulai seeding data...')
   const hashedAdminPass = await bcrypt.hash('admin123', 10)
@@ -24,8 +11,8 @@ async function main() {
     where: { telegramId: 'admin_dashboard' },
     update: {},
     create: {
-      telegramId: 'admin_dashboard',
-      nama: 'Super Admin',
+      telegramId: '7777777',
+      nama: 'Atmin Aseli',
       email: 'admin@sekolah.id',
       password: hashedAdminPass,
       role: 'ADMIN',
@@ -67,7 +54,9 @@ async function main() {
         latitude: comp.lat,
         longitude: comp.long,
         radius: 100,
-        deskripsi: "Tempat magang siswa jurusan RPL dan TKJ."
+        deskripsi: "Tempat magang siswa jurusan RPL dan TKJ.",
+        jam_masuk_kantor: "07:00",
+        jam_pulang_kantor: "15:00"
       }
     })
     createdCompanies.push(c)
@@ -78,10 +67,9 @@ async function main() {
     const firstName = faker.person.firstName()
     const lastName = faker.person.lastName()
     const fullName = `${firstName} ${lastName}`
-    const telegramId = faker.string.numeric(9) // ID Tele biasanya angka 9-10 digit
+    const telegramId = faker.string.numeric(9) 
     const email = faker.internet.email({ firstName, lastName }).toLowerCase()
     
-    // Assign ke perusahaan secara acak
     const randomCompany = createdCompanies[Math.floor(Math.random() * createdCompanies.length)]
 
     const user = await prisma.user.create({
@@ -109,9 +97,13 @@ async function main() {
       const randomMinute = Math.floor(Math.random() * 60)
       jamMasuk.setHours(randomHour, randomMinute, 0)
 
-      let status = "TEPAT WAKTU"
-      if (randomHour > 7 || (randomHour === 7 && randomMinute > 0)) {
-        status = "TERLAMBAT"
+      let statusKehadiran = "TEPAT WAKTU" 
+      let telatMenit = 0
+      const targetHour = 7; 
+      
+      if (randomHour > targetHour || (randomHour === targetHour && randomMinute > 0)) {
+        statusKehadiran = "TERLAMBAT"
+        telatMenit = ((randomHour - targetHour) * 60) + randomMinute
       }
 
       const lat = randomCompany.latitude + (Math.random() - 0.5) * 0.0005
@@ -125,23 +117,11 @@ async function main() {
           jam_keluar: new Date(jamMasuk.getTime() + 8 * 60 * 60 * 1000),
           lat_masuk: lat,
           long_masuk: long,
-          status: status
+          status: "HADIR",
+          status_kehadiran: statusKehadiran, 
+          telat_menit: telatMenit 
         }
       })
-
-      if (Math.random() > 0.2) {
-        const randomActivity = activities[Math.floor(Math.random() * activities.length)]
-        
-        await prisma.jurnal.create({
-          data: {
-            userId: user.telegramId,
-            tanggal: date,
-            isi_kegiatan: randomActivity,
-            bukti_foto: Math.random() > 0.5 ? `https://placehold.co/600x400?text=Bukti+${d}` : null,
-            is_approved: Math.random() > 0.3
-          }
-        })
-      }
     }
   }
 
@@ -156,4 +136,4 @@ main()
     console.error(e)
     await prisma.$disconnect()
     process.exit(1)
-  })    
+  })

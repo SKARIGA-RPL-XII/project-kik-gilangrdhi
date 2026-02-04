@@ -1,5 +1,5 @@
 import { prisma } from "@/src/lib/db";
-import { Users, UserCheck, Clock, MapPin } from "lucide-react";
+import { Users, UserCheck, Clock, MapPin, Calendar, CheckCircle, AlertCircle } from "lucide-react";
 import StatsCard from "@/components/StatsCard";
 import Link from "next/link";
 
@@ -54,7 +54,7 @@ export default async function Dashboard() {
             </p>
           </div>
           <div className="text-sm font-medium text-sky-600 bg-white/80 backdrop-blur-sm px-4 py-2 rounded-full border border-sky-100 shadow-sm flex items-center gap-2">
-            <span>📅</span>
+            <Calendar className="w-4 h-4" />
             {new Date().toLocaleDateString("id-ID", {
               weekday: "long",
               year: "numeric",
@@ -116,12 +116,22 @@ export default async function Dashboard() {
                         })}
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${
+                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
                           item.status === "TERLAMBAT"
                             ? "bg-orange-100 text-orange-700 border-orange-200"
                             : "bg-green-100 text-green-700 border-green-200"
                         }`}>
-                          {item.status === "TERLAMBAT" ? "⚠️ Terlambat" : "✅ Tepat Waktu"}
+                          {item.status === "TERLAMBAT" ? (
+                            <>
+                              <AlertCircle className="w-3.5 h-3.5" />
+                              Terlambat
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="w-3.5 h-3.5" />
+                              Tepat Waktu
+                            </>
+                          )}
                         </span>
                       </td>
                       <td className="px-6 py-4 text-gray-400 text-xs font-mono">

@@ -1,11 +1,9 @@
-// prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite" // Ganti 'postgresql' saat deploy production
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
@@ -14,32 +12,28 @@ model Company {
   nama      String
   deskripsi String?
   alamat    String?
-  
   latitude  Float
   longitude Float
   radius    Int      @default(100)
-  
-  users     User[]
+  jam_masuk_kantor  String   @default("07:00") 
+  jam_pulang_kantor String   @default("15:00")
 
+  users     User[]
   createdAt DateTime @default(now())
 }
 
 model User {
   id          Int      @id @default(autoincrement())
   telegramId  String   @unique 
-  
   nama        String?
   email       String?  @unique 
-  password    String?  
+  password    String?
   role        String   @default("STUDENT") 
   status_akun String   @default("PENDING") 
-  
   companyId   Int?
   company     Company? @relation(fields: [companyId], references: [id])
-  
   absensi     Absensi[]
   jurnals     Jurnal[]
-  
   createdAt   DateTime @default(now())
 }
 
@@ -47,15 +41,16 @@ model Absensi {
   id           Int       @id @default(autoincrement())
   userId       String    
   user         User      @relation(fields: [userId], references: [telegramId])
-  tanggal      DateTime  @default(now()) // Untuk grouping per hari
+  tanggal      DateTime  @default(now()) 
   jam_masuk    DateTime  @default(now())
-  jam_keluar   DateTime? 
+  jam_keluar   DateTime?
   lat_masuk    Float
   long_masuk   Float
   status       String    
+  status_kehadiran String?
+  telat_menit      Int?
 }
 
-// 4. DATA JURNAL (Laporan Kegiatan)
 model Jurnal {
   id           Int      @id @default(autoincrement())
   userId       String
