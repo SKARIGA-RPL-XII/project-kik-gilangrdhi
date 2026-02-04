@@ -10,6 +10,8 @@ interface CompanyFormInput {
   latitude: string | number;
   longitude: string | number;
   radius: string | number;
+  jam_masuk_kantor: string;
+  jam_pulang_kantor: string;
 }
 
 export async function createCompany(data: CompanyFormInput) {
@@ -22,6 +24,8 @@ export async function createCompany(data: CompanyFormInput) {
         latitude: parseFloat(data.latitude.toString()),
         longitude: parseFloat(data.longitude.toString()),
         radius: parseFloat(data.radius.toString()),
+        jam_masuk_kantor: data.jam_masuk_kantor,  
+        jam_pulang_kantor: data.jam_pulang_kantor,
       },
     });
     revalidatePath("/company");
@@ -43,6 +47,8 @@ export async function updateCompany(id: number, data: CompanyFormInput) {
         latitude: parseFloat(data.latitude.toString()),
         longitude: parseFloat(data.longitude.toString()),
         radius: parseFloat(data.radius.toString()),
+        jam_masuk_kantor: data.jam_masuk_kantor,  
+        jam_pulang_kantor: data.jam_pulang_kantor,
       },
     });
     revalidatePath("/company");
