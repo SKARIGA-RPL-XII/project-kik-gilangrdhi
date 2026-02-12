@@ -83,15 +83,16 @@ bot.command(["start", "mulai"], async (ctx) => {
 bot.command("bantuan", (ctx) => {
   ctx.reply(
     `🛠️ <b>PANDUAN PENGGUNAAN</b>\n\n` +
-      `📍 <b>Absensi (Wajib Live Location)</b>\n` +
-      `/masuk - Panduan Absen Masuk\n` +
-      `/pulang - Panduan Absen Pulang\n\n` +
-      `📝 <b>Jurnal PKL</b>\n` +
-      `• <b>Upload:</b> Kirim FOTO + CAPTION langsung.\n` +
-      `/jurnal - Lihat & Kelola Jurnal (Edit/Hapus)\n\n` +
-      `📂 <b>Akun</b>\n` +
-      `/rekap - Cek Rekap Absensi Bulanan\n` +
-      `/profil - Cek Data Diri & Status`,
+    `<code>/daftar</code> - Mendaftarkan Akun\n\n` + 
+    `📍 <b>Absensi (Wajib Live Location)</b>\n` +
+    `<code>/masuk</code> - Panduan Absen Masuk\n` +
+    `<code>/pulang</code> - Panduan Absen Pulang\n\n` +
+    `📝 <b>Jurnal PKL</b>\n` +
+    `<b>Upload:</b> Kirim FOTO + CAPTION langsung.\n` +
+    `<code>/jurnal</code> - Lihat & Kelola Jurnal (Edit/Hapus)\n\n` +
+    `📂 <b>Akun</b>\n` +
+    `<code>/rekap</code> - Cek Rekap Absensi Bulanan\n` +
+    `<code>/profil</code> - Cek Data Diri & Status`,
     { parse_mode: "HTML" }
   );
 });
@@ -103,7 +104,7 @@ bot.command("daftar", async (ctx) => {
 
   if (!emailInput.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
     return ctx.reply(
-      "⚠️ Format email salah. Contoh: <code>/daftar budi@smk.sch.id</code>",
+      "⚠️ Format email salah. Contoh: <code>/daftar budi@gmail.com</code>",
       { parse_mode: "HTML" }
     );
   }
@@ -407,7 +408,6 @@ bot.on("location", async (ctx) => {
     const user = await prisma.user.findUnique({ where: { telegramId }, include: { company: true } });
     if (!user?.company) return ctx.reply("⚠️ Anda belum ditempatkan di kantor magang.");
 
-    // Cek Jarak
     const jarak = getDistance(latitude, longitude, user.company.latitude, user.company.longitude);
     
     if (jarak > user.company.radius) {
@@ -496,7 +496,7 @@ bot.on("location", async (ctx) => {
 
 bot.on("message", (ctx) => {
   if ("text" in ctx.message) {
-     ctx.reply("❓ Perintah tidak dikenali.\nSilakan ketik /bantuan untuk melihat menu.");
+      ctx.reply("❓ Perintah tidak dikenali.\nSilakan ketik /bantuan untuk melihat menu.");
   }
 });
 
