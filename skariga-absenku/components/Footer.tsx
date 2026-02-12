@@ -3,74 +3,74 @@
 import Link from "next/link";
 
 export default function Footer() {
+  const links = [
+    { name: "Tentang", href: "https://id.wikipedia.org/wiki/SMK_PGRI_3_Malang" },
+    { name: "Kurikulum", href: "https://kurikulum.kemendikdasmen.go.id/" },
+    { name: "Prestasi", href: "https://radarmalang.jawapos.com/pendidikan/816452960/smk-pgri-3-malang-sabet-emas-dan-perak-di-ajang-lks-tingkat-nasional-2025" },
+    { name: "Lowongan Kerja", href: "https://bki-skariga.web.id/loker/" },
+    { name: "Kerja Sama", href: "https://bki-skariga.web.id/kerjasama-industri/" }
+  ];
+
   return (
-    <footer className="w-full bg-linear-to-b from-sky-50 via-white to-orange-50 pt-16 pb-10 border-t border-sky-100 relative overflow-hidden">
-      <div className="absolute -top-10 left-10 w-60 h-60 bg-sky-200 opacity-20 blur-[80px] rounded-full pointer-events-none" />
-      <div className="absolute bottom-0 right-10 w-60 h-60 bg-orange-200 opacity-20 blur-[80px] rounded-full pointer-events-none" />
+    <footer className="relative w-full pt-20 pb-10 bg-white border-t border-slate-200 overflow-hidden">
+      <div className="absolute inset-0 w-full h-full bg-[linear-gradient(to_right,#f1f5f9_1px,transparent_1px),linear-gradient(to_bottom,#f1f5f9_1px,transparent_1px)] bg-size-[40px_40px] pointer-events-none" />
+      <div className="absolute top-0 left-0 w-full h-0.5 bg-sky-500" />
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-1 bg-orange-500 rounded-b-lg shadow-sm" />
 
-      <div className="max-w-6xl mx-auto px-6 text-center relative z-10">
-        <h2 className="text-3xl font-bold bg-linear-to-r from-sky-600 to-orange-500 bg-clip-text text-transparent mb-6">
-          Skariga AbsenKu
-        </h2>
+      <div className="max-w-7xl mx-auto px-6 relative z-10 flex flex-col items-center">
+        <div className="text-center mb-12">
+            <h2 className="text-4xl md:text-5xl font-black tracking-tight mb-4 text-slate-800">
+              Skariga<span className="text-orange-500">AbsenKu</span>
+              <span className="text-sky-500">.</span>
+            </h2>
+            <div className="flex items-center justify-center gap-3">
+               <span className="h-px w-12 bg-slate-300"></span>
+               <p className="text-slate-500 font-medium text-sm tracking-wide uppercase">
+                  Sistem Absensi Terintegrasi
+               </p>
+               <span className="h-px w-12 bg-slate-300"></span>
+            </div>
+        </div>
 
-        <div className="flex flex-wrap justify-center gap-8 text-gray-600 font-medium text-sm mb-10">
-          {[
-            { name: "Tentang", href: "https://id.wikipedia.org/wiki/SMK_PGRI_3_Malang" },
-            { name: "Kurikulum", href: "https://kurikulum.kemendikdasmen.go.id/" },
-            { name: "Prestasi", href: "https://radarmalang.jawapos.com/pendidikan/816452960/smk-pgri-3-malang-sabet-emas-dan-perak-di-ajang-lks-tingkat-nasional-2025" },
-            { name: "Lowongan Kerja", href: "https://bki-skariga.web.id/loker/" },
-            { name: "Kerja Sama", href: "https://bki-skariga.web.id/kerjasama-industri/" }
-          ].map((item) => (
+        <div className="flex flex-wrap justify-center gap-4 mb-14">
+          {links.map((item) => (
             <a
               key={item.name}
               href={item.href}
               target={item.href.startsWith('http') ? "_blank" : "_self"}
               rel="noopener noreferrer"
-              className="hover:text-sky-600 hover:scale-105 transition-all"
+              className="px-5 py-2.5 rounded-lg text-sm font-bold text-slate-600 border-2 border-slate-100 bg-white hover:border-sky-500 hover:text-sky-600 hover:-translate-y-1 transition-all duration-200"
             >
               {item.name}
             </a>
           ))}
         </div>
-
-        <div className="flex justify-center gap-6 mb-8">
-          {["school", "menu_book", "groups", "workspace_premium"].map((icon) => (
-            <Link key={icon} href="#" className="footer-icon group">
-              <span className="material-symbols-rounded text-[28px] group-hover:text-white transition-colors">
-                {icon}
-              </span>
+        <div className="flex gap-6 mb-12">
+          {["school", "menu_book", "groups", "workspace_premium"].map((icon, index) => (
+            <Link key={index} href="#" className="group relative">
+              <div className="relative flex items-center justify-center w-14 h-14 bg-white border-2 border-slate-200 rounded-xl text-slate-400 transition-all duration-300 
+                group-hover:border-orange-500 group-hover:bg-orange-50 group-hover:text-orange-600 group-hover:-translate-y-1 group-hover:shadow-[4px_4px_0px_0px_rgba(249,115,22,1)]">
+                
+                <span className="material-symbols-rounded text-[28px]">
+                  {icon}
+                </span>
+              </div>
             </Link>
           ))}
         </div>
 
-        <div className="h-px bg-linear-to-r from-transparent via-gray-300 to-transparent mb-6 opacity-60" />
+        <div className="w-full border-t-2 border-dashed border-slate-200 pt-8 flex flex-col md:flex-row items-center justify-between gap-4 text-xs font-bold text-slate-500">
+          <p className="flex items-center gap-1 bg-slate-100 px-3 py-1 rounded-md">
+            © {new Date().getFullYear()} SMK PGRI 3 Malang
+          </p>
+          
+          <div className="flex items-center gap-6">
+            <span className="hover:text-sky-600 cursor-pointer transition-colors">Privacy Policy</span>
+            <span className="hover:text-sky-600 cursor-pointer transition-colors">Terms of Service</span>
+          </div>
+        </div>
 
-        <p className="text-gray-500 text-sm">
-          © {new Date().getFullYear()} SMK PGRI 3 Malang. All rights reserved.
-        </p>
       </div>
-
-      <style jsx>{`
-        .footer-icon {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 50px;
-          height: 50px;
-          border-radius: 50%;
-          background: white;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-          color: #64748b;
-          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-          border: 1px solid rgba(255,255,255,0.5);
-        }
-        .footer-icon:hover {
-          transform: translateY(-5px) rotate(6deg);
-          background: linear-gradient(135deg, #38bdf8, #fb923c);
-          box-shadow: 0 10px 20px rgba(56, 189, 248, 0.3);
-          border-color: transparent;
-        }
-      `}</style>
     </footer>
   );
 }
