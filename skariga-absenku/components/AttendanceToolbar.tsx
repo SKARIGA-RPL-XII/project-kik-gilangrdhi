@@ -64,7 +64,7 @@ export default function AttendanceToolbar() {
     { value: "name_asc", label: "Nama (A-Z)", icon: ArrowUpAZ },
     { value: "name_desc", label: "Nama (Z-A)", icon: ArrowDownZA },
     { value: "status_late", label: "Terlambat", icon: AlertCircle },
-    { value: "status_ontime", label: "Tepat Waktu", icon: CheckCircle2 },
+    { value: "status_ontime", label: "Hadir", icon: CheckCircle2 },
   ];
 
   const currentSortOption = sortOptions.find(o => o.value === sort);

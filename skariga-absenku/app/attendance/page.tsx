@@ -46,17 +46,28 @@ export default async function AttendancePage(props: PageProps) {
     andConditions.push({ jam_masuk: { gte: startDate, lte: endDate } });
   }
 
-  const whereCondition: Prisma.AbsensiWhereInput = { AND: andConditions };
-
   let orderBy: Prisma.AbsensiOrderByWithRelationInput = { jam_masuk: "desc" };
+  
   switch (sort) {
     case "date_asc": orderBy = { jam_masuk: "asc" }; break;
     case "name_asc": orderBy = { user: { nama: "asc" } }; break;
     case "name_desc": orderBy = { user: { nama: "desc" } }; break;
-    case "status_late": andConditions.push({ status: "TERLAMBAT" }); break;
-    case "status_ontime": andConditions.push({ status: "TEPAT WAKTU" }); break;
+    case "status_late": 
+      andConditions.push({ telat_menit: { gt: 0 } }); 
+      break;
+    case "status_ontime": 
+      andConditions.push({ 
+        OR: [
+          { telat_menit: 0 },
+          { telat_menit: null }
+        ]
+      }); 
+      break;
+      
     default: orderBy = { jam_masuk: "desc" };
   }
+
+  const whereCondition: Prisma.AbsensiWhereInput = { AND: andConditions };
 
   const totalItems = await prisma.absensi.count({ where: whereCondition });
   const dataAbsensi = await prisma.absensi.findMany({
@@ -66,6 +77,11 @@ export default async function AttendancePage(props: PageProps) {
     orderBy: orderBy,
     include: { user: true },
   });
+
+  const safeData = dataAbsensi.map(item => ({
+    ...item,
+    telat_menit: item.telat_menit ?? 0, 
+  }));
 
   return (
     <div className="min-h-screen bg-linear-to-br from-sky-50 via-white to-orange-50 relative animate-fadeIn">
@@ -95,7 +111,7 @@ export default async function AttendancePage(props: PageProps) {
         <AttendanceToolbar />
 
         <AttendanceTable 
-          data={dataAbsensi} 
+          data={safeData} 
           totalItems={totalItems} 
           page={page} 
           limit={limit} 

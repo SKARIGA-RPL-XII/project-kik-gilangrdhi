@@ -5,6 +5,22 @@ import fs from "fs";
 import path from "path";
 import axios from "axios";
 
+const MIN_DURASI_MENIT = 15;
+const MAX_DIAM_DETIK = 120;
+const CHECK_INTERVAL = 30000;
+
+interface LiveSession {
+  userId: string;
+  dbId: number;
+  startTime: number;
+  lastUpdate: number;
+  companyLat: number;
+  companyLong: number;
+  radius: number;
+  type: "MASUK" | "PULANG";
+  isInvalid: boolean;
+}
+
 interface ExtendedLocation {
   latitude: number;
   longitude: number;
@@ -12,111 +28,52 @@ interface ExtendedLocation {
   live_period?: number;
 }
 
-interface MonitoringSession {
-  attendanceId: number;
-  startTime: number;
-  lastSeen: number;
-  warned: boolean;
-  isInvalid: boolean;
-  originalStatus: string; 
-}
-
+const sessions = new Map<string, LiveSession>();
 const prisma = new PrismaClient();
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN as string);
-const monitoringMap = new Map<string, MonitoringSession>();
 
-console.log("🔄 Bot Telegram sedang berjalan...");
-
-setInterval(() => {
-  const now = Date.now();
-  
-  monitoringMap.forEach(async (session, userId) => {
-    const duration = now - session.startTime;
-    const silence = now - session.lastSeen;
-
-    if (duration >= 15 * 60 * 1000) {
-      if (!session.warned) {
-         bot.telegram.sendMessage(userId, "✅ <b>Waktu 15 Menit Tercapai.</b>\nTerima kasih, kehadiran Anda valid.", { parse_mode: "HTML" }).catch(() => {});
-      }
-      monitoringMap.delete(userId);
-      return;
-    }
-
-    if (silence > 20 * 1000 && !session.isInvalid) {
-      try {
-        await prisma.absensi.update({
-          where: { id: session.attendanceId },
-          data: { status_kehadiran: "INVALID (GPS MATI)" }
-        });
-
-        bot.telegram.sendMessage(
-          userId, 
-          "⚠️ <b>PERINGATAN KERAS!</b>\n\n" +
-          "Sinyal GPS Anda hilang > 20 detik.\n" +
-          "Status Absensi di Admin diubah menjadi: <b>INVALID (GPS MATI)</b>.\n\n" +
-          "Segera nyalakan Live Location atau ketik /masuk lagi untuk memulihkan status.", 
-          { parse_mode: "HTML" }
-        ).catch(() => {});
-        
-        session.isInvalid = true;
-        session.warned = true;
-        monitoringMap.set(userId, session);
-      } catch (e) {
-        console.error("Gagal update DB Invalid:", e);
-      }
-    }
-  });
-}, 5000);
+console.log("🚀 Bot Absensi High-Performance Siap!");
 
 bot.use(async (ctx, next) => {
   if (!ctx.from) return next();
-
-  const msg = ctx.message || ctx.editedMessage;
-  const telegramId = ctx.from.id.toString();
-  const messageText = msg && "text" in msg ? msg.text : "";
-
-  if (
-    messageText.startsWith("/start") ||
-    messageText.startsWith("/mulai") ||
-    messageText.startsWith("/daftar") ||
-    messageText.startsWith("/bantuan") ||
-    ctx.callbackQuery
-  ) {
-    return next();
-  }
+  const text = ctx.message && "text" in ctx.message ? ctx.message.text : "";
+  if (text.startsWith("/start") || text.startsWith("/bantuan")) return next();
 
   try {
-    const user = await prisma.user.findUnique({ where: { telegramId } });
+    const user = await prisma.user.findUnique({
+      where: { telegramId: ctx.from.id.toString() },
+      include: { company: true },
+    });
 
-    if (!user) {
-      if (ctx.message) {
-         return ctx.reply("⛔ Kamu belum terdaftar. Ketik /daftar emailmu@sekolah.sch.id");
-      }
-      return;
-    }
-    if (user.status_akun === "PENDING") {
-      if (ctx.message) return ctx.reply("⏳ Akun Pending. Tunggu verifikasi.");
-      return;
-    }
-
+    if (!user) return ctx.reply("⛔ Akses Ditolak. Anda belum terdaftar.");
     ctx.state.user = user;
     return next();
-  } catch (error) {
-    console.error(error);
+  } catch (err) {
+    console.error("DB Error:", err);
   }
 });
 
-bot.command(["start", "mulai"], async (ctx) => {
-  const user = await prisma.user.findUnique({ where: { telegramId: ctx.from.id.toString() } });
-  if (!user) {
-    ctx.reply(`👋 <b>Selamat Datang!</b>\nSilakan daftar: <code>/daftar email@sekolah.sch.id</code>`, { parse_mode: "HTML" });
-  } else {
-    ctx.reply(`Halo <b>${user.nama}</b>! Gunakan /masuk untuk absen.`, { parse_mode: "HTML" });
-  }
-});
+bot.command(["start", "mulai"], (ctx) =>
+  ctx.reply(
+    "👋 Halo! Gunakan /masuk untuk absen masuk atau /pulang untuk pulang.",
+  ),
+);
 
 bot.command("bantuan", (ctx) => {
-  ctx.reply("Gunakan /masuk untuk absen masuk dan /pulang untuk absen pulang.");
+  ctx.reply(
+    `🛠️ <b>PANDUAN PENGGUNAAN</b>\n\n` +
+      `<code>/daftar</code> - Mendaftarkan Akun\n\n` +
+      `📍 <b>Absensi (Wajib Live Location)</b>\n` +
+      `<code>/masuk</code> - Panduan Absen Masuk\n` +
+      `<code>/pulang</code> - Panduan Absen Pulang\n\n` +
+      `📝 <b>Jurnal PKL</b>\n` +
+      `<b>Upload:</b> Kirim FOTO + CAPTION langsung.\n` +
+      `<code>/jurnal</code> - Lihat & Kelola Jurnal (Edit/Hapus)\n\n` +
+      `📂 <b>Akun</b>\n` +
+      `<code>/rekap</code> - Cek Rekap Absensi Bulanan\n` +
+      `<code>/profil</code> - Cek Data Diri & Status`,
+    { parse_mode: "HTML" },
+  );
 });
 
 bot.command("daftar", async (ctx) => {
@@ -124,70 +81,165 @@ bot.command("daftar", async (ctx) => {
   const telegramId = ctx.from.id.toString();
   const fullName = `${ctx.from.first_name} ${ctx.from.last_name || ""}`.trim();
 
-  if (!emailInput.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) return ctx.reply("⚠️ Format email salah.");
+  if (!emailInput.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) {
+    return ctx.reply(
+      "⚠️ Format email salah. Contoh: <code>/daftar budi@smk.sch.id</code>",
+      { parse_mode: "HTML" },
+    );
+  }
 
   try {
-    const existingUser = await prisma.user.findUnique({ where: { telegramId } });
-    if (existingUser) return ctx.reply(`✅ Sudah terdaftar a.n ${existingUser.nama}`);
+    const existingUser = await prisma.user.findUnique({
+      where: { telegramId },
+    });
+    if (existingUser)
+      return ctx.reply(
+        `✅ Akun sudah terdaftar a.n <b>${existingUser.nama}</b>.`,
+        { parse_mode: "HTML" },
+      );
 
     await prisma.user.create({
-      data: { telegramId, nama: fullName, email: emailInput, status_akun: "PENDING", role: "STUDENT" },
+      data: {
+        telegramId,
+        nama: fullName,
+        email: emailInput,
+        status_akun: "PENDING",
+        role: "STUDENT",
+      },
     });
-    ctx.reply("🎉 Pendaftaran Berhasil! Tunggu verifikasi guru.");
+
+    ctx.reply(
+      `🎉 <b>Pendaftaran Berhasil!</b>\n` +
+        `Status akun: <b>PENDING</b>.\n` +
+        `Silakan hubungi guru pembimbing untuk aktivasi.`,
+      { parse_mode: "HTML" },
+    );
   } catch {
-    ctx.reply("❌ Email sudah digunakan.");
+    ctx.reply("❌ Email mungkin sudah digunakan oleh siswa lain.");
   }
 });
 
 bot.command("profil", async (ctx) => {
   const telegramId = ctx.from.id.toString();
-  const user = await prisma.user.findUnique({ where: { telegramId }, include: { company: true } });
-  if (!user) return ctx.reply("❌ Belum terdaftar.");
-  ctx.reply(`👤 <b>PROFIL</b>\nNama: ${user.nama}\nMagang: ${user.company?.nama || "-"}\nStatus: ${user.status_akun}`, { parse_mode: "HTML" });
+  try {
+    const user = await prisma.user.findUnique({
+      where: { telegramId },
+      include: { company: true },
+    });
+
+    if (!user) return ctx.reply("❌ Kamu belum terdaftar.");
+
+    const companyName = user.company ? user.company.nama : "Belum ditempatkan";
+    const status = user.status_akun === "PENDING" ? "⏳ Pending" : "✅ Aktif";
+
+    ctx.reply(
+      `👤 <b>PROFIL SISWA</b>\n\n` +
+        `📛 <b>Nama:</b> ${user.nama}\n` +
+        `📧 <b>Email:</b> ${user.email}\n` +
+        `🏢 <b>Magang:</b> ${companyName}\n` +
+        `🏷 <b>Status:</b> ${status}`,
+      { parse_mode: "HTML" },
+    );
+  } catch (err) {
+    console.error(err);
+    ctx.reply("❌ Gagal memuat profil.");
+  }
 });
 
 bot.command("rekap", async (ctx) => {
-    const year = new Date().getFullYear();
-    const months = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
-    const buttons = [];
-    let row = [];
-    for (let i = 0; i < months.length; i++) {
-      row.push(Markup.button.callback(months[i], `rekap_bulan_${i}_${year}`));
-      if (row.length === 4 || i === months.length - 1) { buttons.push(row); row = []; }
+  const year = new Date().getFullYear();
+  const months = [
+    "Januari",
+    "Februari",
+    "Maret",
+    "April",
+    "Mei",
+    "Juni",
+    "Juli",
+    "Agustus",
+    "September",
+    "Oktober",
+    "November",
+    "Desember",
+  ];
+
+  const buttons = [];
+  let row = [];
+  for (let i = 0; i < months.length; i++) {
+    row.push(Markup.button.callback(months[i], `rekap_bulan_${i}_${year}`));
+    if (row.length === 3 || i === months.length - 1) {
+      buttons.push(row);
+      row = [];
     }
-    ctx.reply(`📅 Pilih Bulan Rekap ${year}:`, Markup.inlineKeyboard(buttons));
+  }
+
+  ctx.reply(`📅 <b>Pilih Bulan Rekap Tahun ${year}:</b>`, {
+    parse_mode: "HTML",
+    ...Markup.inlineKeyboard(buttons),
+  });
 });
-  
+
 bot.action(/rekap_bulan_(\d+)_(\d+)/, async (ctx) => {
-    if (!ctx.match) return;
-    const [, m, y] = ctx.match;
-    const start = new Date(parseInt(y), parseInt(m), 1);
-    const end = new Date(parseInt(y), parseInt(m) + 1, 0); end.setHours(23, 59, 59);
-    
+  if (!ctx.match) return;
+  const monthIndex = parseInt(ctx.match[1]);
+  const year = parseInt(ctx.match[2]);
+  const telegramId = ctx.from!.id.toString();
+  const startDate = new Date(year, monthIndex, 1);
+  const endDate = new Date(year, monthIndex + 1, 0);
+  endDate.setHours(23, 59, 59);
+
+  const namaBulan = startDate.toLocaleDateString("id-ID", { month: "long" });
+
+  try {
     const history = await prisma.absensi.findMany({
-      where: { userId: ctx.from!.id.toString(), tanggal: { gte: start, lte: end } },
-      orderBy: { tanggal: "asc" }
+      where: { userId: telegramId, tanggal: { gte: startDate, lte: endDate } },
+      orderBy: { tanggal: "asc" },
     });
-  
-    if (!history.length) return ctx.editMessageText("📂 Tidak ada data.");
-    
-    let msg = `📊 <b>Rekap ${start.toLocaleDateString("id-ID", {month:"long"})}</b>\n`;
-    history.forEach(d => {
-        const dateWIB = new Date(d.jam_masuk.getTime() + (7*3600000));
-        const tgl = dateWIB.getDate();
-        const inTime = dateWIB.toLocaleTimeString("id-ID", {hour:"2-digit", minute:"2-digit", timeZone:"UTC"});
-        const outTime = d.jam_keluar ? new Date(d.jam_keluar.getTime() + (7*3600000)).toLocaleTimeString("id-ID", {hour:"2-digit", minute:"2-digit", timeZone:"UTC"}) : "--:--";
-        msg += `${d.status_kehadiran==="TERLAMBAT"?"⚠️":"✅"} ${tgl} | ${inTime}-${outTime}\n`;
+
+    if (history.length === 0) {
+      return ctx.editMessageText(
+        `📂 Tidak ada data absensi di bulan <b>${namaBulan} ${year}</b>.`,
+        { parse_mode: "HTML" },
+      );
+    }
+
+    let message = `📊 <b>Rekap Absensi: ${namaBulan} ${year}</b>\n\n`;
+    history.forEach((data) => {
+      const tgl = new Date(data.jam_masuk).toLocaleDateString("id-ID", {
+        day: "numeric",
+        month: "short",
+      });
+      const jamMasuk = new Date(data.jam_masuk).toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      const jamKeluar = data.jam_keluar
+        ? new Date(data.jam_keluar).toLocaleTimeString("id-ID", {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        : "--:--";
+      const iconStatus = (data.telat_menit ?? 0) > 0 ? "⚠️" : "✅";
+
+      message += `${iconStatus} <b>${tgl}</b> | ${jamMasuk} - ${jamKeluar}\n`;
     });
-    ctx.editMessageText(msg, { parse_mode: "HTML" });
+
+    await ctx.editMessageText(message, { parse_mode: "HTML" });
+  } catch {
+    ctx.reply("❌ Gagal mengambil data.");
+  }
 });
 
 bot.on("photo", async (ctx) => {
-  if (!ctx.state.user) return; 
+  if (!ctx.state.user) return;
   const telegramId = ctx.from.id.toString();
   const caption = ctx.message.caption;
 
-  if (!caption) return ctx.reply("⚠️ <b>Gagal Upload</b>\nMohon sertakan caption.", { parse_mode: "HTML" });
+  if (!caption)
+    return ctx.reply(
+      "⚠️ <b>Gagal Upload</b>\nMohon sertakan caption/keterangan kegiatan pada foto.",
+      { parse_mode: "HTML" },
+    );
 
   try {
     ctx.reply("⏳ Mengunggah jurnal...");
@@ -200,25 +252,28 @@ bot.on("photo", async (ctx) => {
     const folderPath = path.join(process.cwd(), "public", "uploads");
     const filePath = path.join(folderPath, fileName);
 
-    if (!fs.existsSync(folderPath)) fs.mkdirSync(folderPath, { recursive: true });
+    if (!fs.existsSync(folderPath))
+      fs.mkdirSync(folderPath, { recursive: true });
 
-    const response = await axios({ url: fileLink.href, responseType: "stream" });
+    const response = await axios({
+      url: fileLink.href,
+      responseType: "stream",
+    });
     response.data.pipe(fs.createWriteStream(filePath));
-
-    const nowUTC = new Date();
-    const nowWIB = new Date(nowUTC.getTime() + (7 * 60 * 60 * 1000));
 
     await prisma.jurnal.create({
       data: {
         userId: telegramId,
         isi_kegiatan: caption,
         bukti_foto: fileName,
-        tanggal: nowWIB,
+        tanggal: new Date(),
         is_approved: false,
       },
     });
 
-    ctx.reply("✅ <b>Jurnal Tersimpan!</b>\nCek riwayat di /jurnal", { parse_mode: "HTML" });
+    ctx.reply("✅ <b>Jurnal Tersimpan!</b>\nCek riwayat di /jurnal", {
+      parse_mode: "HTML",
+    });
   } catch {
     ctx.reply("❌ Gagal upload foto.");
   }
@@ -235,12 +290,19 @@ bot.command(["jurnal", "listjurnal"], async (ctx) => {
   if (listJurnal.length === 0) return ctx.reply("📂 Belum ada jurnal.");
 
   const buttons = listJurnal.map((j) => {
-    const dateWIB = new Date(j.tanggal.getTime() + (7 * 60 * 60 * 1000));
-    const tgl = dateWIB.toLocaleDateString("id-ID", { day: "numeric", month: "short", timeZone: "UTC" });
-    return [Markup.button.callback(`📅 ${tgl} - ${j.isi_kegiatan.substring(0, 15)}...`, `view_jurnal_${j.id}`)];
+    const tgl = new Date(j.tanggal).toLocaleDateString("id-ID", {
+      day: "numeric",
+      month: "short",
+    });
+    return [
+      Markup.button.callback(
+        `📅 ${tgl} - ${j.isi_kegiatan.substring(0, 15)}...`,
+        `view_jurnal_${j.id}`,
+      ),
+    ];
   });
 
-  ctx.reply("📚 <b>Pilih Jurnal:</b>", {
+  ctx.reply("📚 <b>Pilih Jurnal untuk Detail/Edit:</b>", {
     parse_mode: "HTML",
     ...Markup.inlineKeyboard(buttons),
   });
@@ -255,27 +317,47 @@ bot.action(/view_jurnal_(\d+)/, async (ctx) => {
     if (!jurnal) return ctx.reply("❌ Jurnal tidak ditemukan.");
 
     const namaFileFoto = jurnal.bukti_foto || "";
-    const dateWIB = new Date(jurnal.tanggal.getTime() + (7 * 60 * 60 * 1000));
-    const tgl = dateWIB.toLocaleDateString("id-ID", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
-    
+    const tgl = new Date(jurnal.tanggal).toLocaleDateString("id-ID", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
     const caption = `<b>DETAIL JURNAL</b>\n\n🗓 <b>Tanggal:</b> ${tgl}\n📝 <b>Kegiatan:</b>\n${jurnal.isi_kegiatan}\n\n<i>Status: ${jurnal.is_approved ? "✅ Disetujui" : "⏳ Menunggu"}</i>`;
 
     const keyboard = Markup.inlineKeyboard([
-      [Markup.button.callback("✏️ Edit Teks", `edit_jurnal_${idJurnal}`), Markup.button.callback("🗑️ Hapus", `conf_del_jurnal_${idJurnal}`)],
+      [
+        Markup.button.callback("✏️ Edit Teks", `edit_jurnal_${idJurnal}`),
+        Markup.button.callback("🗑️ Hapus", `conf_del_jurnal_${idJurnal}`),
+      ],
       [Markup.button.callback("🔙 Kembali", "back_list_jurnal")],
     ]);
 
     await ctx.deleteMessage().catch(() => {});
 
     if (!namaFileFoto) {
-      return ctx.reply(`⚠️ [Foto Tidak Tersedia]\n\n${caption}`, { parse_mode: "HTML", ...keyboard });
+      return ctx.reply(`⚠️ [Foto Tidak Tersedia]\n\n${caption}`, {
+        parse_mode: "HTML",
+        ...keyboard,
+      });
     }
 
-    const filePath = path.join(process.cwd(), "public", "uploads", namaFileFoto);
+    const filePath = path.join(
+      process.cwd(),
+      "public",
+      "uploads",
+      namaFileFoto,
+    );
     if (fs.existsSync(filePath)) {
-      await ctx.replyWithPhoto({ source: filePath }, { caption: caption, parse_mode: "HTML", ...keyboard });
+      await ctx.replyWithPhoto(
+        { source: filePath },
+        { caption: caption, parse_mode: "HTML", ...keyboard },
+      );
     } else {
-      await ctx.reply(`⚠️ [File Foto Terhapus]\n\n${caption}`, { parse_mode: "HTML", ...keyboard });
+      await ctx.reply(`⚠️ [File Foto Terhapus]\n\n${caption}`, {
+        parse_mode: "HTML",
+        ...keyboard,
+      });
     }
   } catch (error) {
     console.error(error);
@@ -284,201 +366,256 @@ bot.action(/view_jurnal_(\d+)/, async (ctx) => {
 });
 
 bot.action(/conf_del_jurnal_(\d+)/, async (ctx) => {
-    if (!ctx.match) return;
-    const idJurnal = parseInt(ctx.match[1]);
-    await prisma.jurnal.delete({ where: { id: idJurnal } });
-    await ctx.deleteMessage();
-    await ctx.reply("🗑️ Jurnal berhasil dihapus.");
+  if (!ctx.match) return;
+  const idJurnal = parseInt(ctx.match[1]);
+  await prisma.jurnal.delete({ where: { id: idJurnal } });
+  await ctx.deleteMessage();
+  await ctx.reply("🗑️ Jurnal berhasil dihapus.");
 });
-  
+
 bot.action(/edit_jurnal_(\d+)/, async (ctx) => {
-    if (!ctx.match) return;
-    const idJurnal = ctx.match[1];
-    await ctx.reply(`Silakan ketik keterangan baru untuk Jurnal ID: ${idJurnal}`, Markup.forceReply());
-    await ctx.answerCbQuery();
+  if (!ctx.match) return;
+  const idJurnal = ctx.match[1];
+  await ctx.reply(
+    `Silakan ketik keterangan baru untuk Jurnal ID: ${idJurnal}`,
+    Markup.forceReply(),
+  );
+  await ctx.answerCbQuery();
 });
-  
+
 bot.action("back_list_jurnal", async (ctx) => {
-    await ctx.deleteMessage();
-    ctx.reply("Ketik /jurnal untuk melihat daftar kembali.");
+  await ctx.deleteMessage();
+  ctx.reply("Ketik /jurnal untuk melihat daftar kembali.");
 });
-  
+
 bot.on("text", async (ctx, next) => {
-    const replyTo = ctx.message.reply_to_message;
-    if (replyTo && "text" in replyTo && replyTo.text.startsWith("Silakan ketik keterangan baru untuk Jurnal ID:")) {
-      const textBaru = ctx.message.text;
-      const idJurnalStr = replyTo.text.split("ID: ")[1];
-      const idJurnal = parseInt(idJurnalStr);
-      if (idJurnal && textBaru) {
-        await prisma.jurnal.update({ where: { id: idJurnal }, data: { isi_kegiatan: textBaru } });
-        return ctx.reply(`✅ Jurnal berhasil diupdate!`);
-      }
+  const replyTo = ctx.message.reply_to_message;
+  if (
+    replyTo &&
+    "text" in replyTo &&
+    replyTo.text.startsWith("Silakan ketik keterangan baru untuk Jurnal ID:")
+  ) {
+    const textBaru = ctx.message.text;
+    const idJurnalStr = replyTo.text.split("ID: ")[1];
+    const idJurnal = parseInt(idJurnalStr);
+    if (idJurnal && textBaru) {
+      await prisma.jurnal.update({
+        where: { id: idJurnal },
+        data: { isi_kegiatan: textBaru },
+      });
+      return ctx.reply(`✅ Jurnal berhasil diupdate!`);
     }
-    next();
+  }
+  next();
 });
 
 bot.command(["masuk", "pulang"], (ctx) => {
   ctx.reply(
-    "📍 <b>ABSENSI LIVE LOCATION</b>\n\n" +
-    "1. Klik 📎 > 📍 Location.\n" +
-    "2. Pilih <b>'Share My Live Location'</b>.\n" +
-    "3. Pilih durasi <b>15 Menit</b>.\n\n" +
-    "⚠️ <b>JANGAN STOP LIVE LOCATION!</b>\nSistem akan memantau posisi Anda.",
-    { parse_mode: "HTML", reply_markup: { remove_keyboard: true } }
+    `📍 <b>INSTRUKSI ABSENSI</b>\n\n` +
+      `1. Klik 📎 (Klip Kertas) di pojok kiri bawah.\n` +
+      `2. Pilih menu 📍 <b>Location</b>.\n` +
+      `3. Pilih <b>'Share My Live Location for...'</b>\n` +
+      `4. Pilih durasi <b>15 Menit</b> (Minimal).\n\n` +
+      `⚠️ <b>PENTING:</b>\n` +
+      `- Jangan matikan Live Location sebelum ${MIN_DURASI_MENIT} menit berakhir.\n` +
+      `- Jangan keluar dari area kantor.\n` +
+      `- Jika melanggar, absen otomatis <b>INVALID</b>.`,
+    { parse_mode: "HTML" },
   );
 });
 
-bot.on(["location", "edited_message"], async (ctx) => {
-  const telegramId = ctx.from.id.toString();
-  const msg = ctx.message || ctx.editedMessage;
-  
-  if (!msg || !("location" in msg)) return;
+bot.on("location", async (ctx) => {
+  const user = ctx.state.user;
+  const msg = ctx.message;
+  const loc = msg.location;
+  const extLoc = loc as ExtendedLocation;
 
-  const { latitude, longitude, horizontal_accuracy, live_period } = msg.location as ExtendedLocation;
-
-  if ("forward_date" in msg) return ctx.reply("⛔ Jangan forward lokasi!");
-
-  if (!live_period) {
-     if (ctx.message) ctx.reply("⚠️ Gunakan <b>Live Location</b> (Peta Bergerak).", { parse_mode: "HTML" });
-     return;
+  if (!("live_period" in extLoc)) {
+    return ctx.reply(
+      "❌ <b>SALAH!</b>\nAnda mengirim lokasi diam (Static).\nMohon kirim <b>Live Location</b> (Peta Bergerak).",
+      { parse_mode: "HTML" },
+    );
   }
 
-  if (horizontal_accuracy !== undefined && horizontal_accuracy === 0) {
-    if (ctx.message) ctx.reply("⛔ <b>FAKE GPS TERDETEKSI!</b>", { parse_mode: "HTML" });
-    return;
+  if (!user.company)
+    return ctx.reply("⚠️ Anda belum ditempatkan di kantor manapun.");
+
+  const jarak = getDistance(
+    loc.latitude,
+    loc.longitude,
+    user.company.latitude,
+    user.company.longitude,
+  );
+  if (jarak > user.company.radius) {
+    return ctx.reply(
+      `⛔ <b>DILUAR JANGKAUAN!</b>\nJarak: ${jarak.toFixed(0)}m (Max: ${user.company.radius}m).\nSilakan masuk ke area kantor.`,
+    );
   }
+
+  const now = new Date();
+  const todayStart = new Date(now.setHours(0, 0, 0, 0));
 
   try {
-    const user = await prisma.user.findUnique({ where: { telegramId }, include: { company: true } });
-    if (!user?.company) return;
-
-    const jarak = getDistance(latitude, longitude, user.company.latitude, user.company.longitude);
-    const radiusKantor = user.company.radius;
-
-    const nowUTC = new Date();
-    const updateTime = "edit_date" in msg ? new Date((msg as { edit_date: number }).edit_date * 1000) : nowUTC;
-    const offsetWIB = 7 * 60 * 60 * 1000;
-    const nowWIB = new Date(updateTime.getTime() + offsetWIB);
-    const startOfDayWIB = new Date(nowWIB); startOfDayWIB.setUTCHours(0, 0, 0, 0);
-
-    const absenHariIni = await prisma.absensi.findFirst({
-      where: { userId: telegramId, tanggal: { gte: startOfDayWIB } },
-      orderBy: { jam_masuk: "desc" }
+    const lastAbsen = await prisma.absensi.findFirst({
+      where: { userId: user.telegramId, tanggal: { gte: todayStart } },
+      orderBy: { jam_masuk: "desc" },
     });
 
-    if (!absenHariIni || (absenHariIni && (absenHariIni.status_kehadiran || "").includes("INVALID") && jarak <= radiusKantor)) {
-      
-      if (jarak > radiusKantor) {
-         if (ctx.message && !absenHariIni) ctx.reply(`❌ Jarak terlalu jauh: ${jarak.toFixed(0)}m.`);
-         return; 
+    let absenId = 0;
+    let type: "MASUK" | "PULANG" = "MASUK";
+
+    if (!lastAbsen) {
+      const [tJam, tMenit] = (user.company.jam_masuk_kantor || "07:00")
+        .split(":")
+        .map(Number);
+      const target = new Date();
+      target.setHours(tJam, tMenit, 0, 0);
+
+      let telat = 0;
+
+      if (new Date() > target) {
+        telat = Math.floor((new Date().getTime() - target.getTime()) / 60000);
       }
 
-      const [targetJam, targetMenit] = (user.company.jam_masuk_kantor || "07:00").split(":").map(Number);
-      const deadlineWIB = new Date(nowWIB); deadlineWIB.setUTCHours(targetJam, targetMenit, 0, 0);
-
-      let statusKehadiran = "HADIR";
-      let telatMenit = 0;
-
-      if (nowWIB > deadlineWIB) {
-        statusKehadiran = "TERLAMBAT";
-        telatMenit = Math.floor((nowWIB.getTime() - deadlineWIB.getTime()) / 60000);
-      }
-
-      if (absenHariIni && (absenHariIni.status_kehadiran || "").includes("INVALID")) {
-        await prisma.absensi.update({
-          where: { id: absenHariIni.id },
-          data: { status_kehadiran: statusKehadiran }
-        });
-        
-        const session = monitoringMap.get(telegramId);
-        if (session) {
-           session.isInvalid = false;
-           session.lastSeen = Date.now();
-           monitoringMap.set(telegramId, session);
-        } else {
-           monitoringMap.set(telegramId, { 
-             attendanceId: absenHariIni.id,
-             startTime: Date.now(), 
-             lastSeen: Date.now(), 
-             warned: false, 
-             isInvalid: false,
-             originalStatus: statusKehadiran
-           });
-        }
-        
-        ctx.reply("✅ <b>GPS KEMBALI NORMAL!</b>\nStatus absensi dipulihkan menjadi Valid.", { parse_mode: "HTML", reply_parameters: { message_id: msg.message_id } });
-      } 
-      else {
-        const newAbsen = await prisma.absensi.create({
-          data: {
-            userId: telegramId,
-            jam_masuk: nowUTC,
-            status: "HADIR",
-            lat_masuk: latitude,
-            long_masuk: longitude,
-            tanggal: nowUTC,
-            status_kehadiran: statusKehadiran,
-            telat_menit: telatMenit,
-          },
-        });
-        
-        monitoringMap.set(telegramId, { 
-          attendanceId: newAbsen.id,
-          startTime: Date.now(), 
-          lastSeen: Date.now(), 
-          warned: false, 
-          isInvalid: false,
-          originalStatus: statusKehadiran
-        });
-
-        let pesan = `✅ <b>ABSEN MASUK BERHASIL</b>\n`;
-        pesan += `🕒 ${nowWIB.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} WIB\n`;
-        pesan += `📍 Jarak: ${jarak.toFixed(0)}m\n\n`;
-        pesan += `⚠️ <b>JANGAN MATIKAN LIVE LOCATION!</b>\nSistem memantau posisi Anda selama 15 menit.`;
-        
-        ctx.reply(pesan, { parse_mode: "HTML", reply_parameters: { message_id: msg.message_id } });
-      }
+      const newRecord = await prisma.absensi.create({
+        data: {
+          userId: user.telegramId,
+          jam_masuk: new Date(),
+          tanggal: new Date(),
+          lat_masuk: loc.latitude,
+          long_masuk: loc.longitude,
+          status: "VALIDATING (15 Menit)",
+          telat_menit: telat,
+        },
+      });
+      absenId = newRecord.id;
+      ctx.reply(
+        `✅ <b>ABSEN MASUK DICATAT</b>\n⏳ Mohon pertahankan Live Location selama ${MIN_DURASI_MENIT} menit untuk validasi.`,
+        { parse_mode: "HTML" },
+      );
+    } else if (!lastAbsen.jam_keluar) {
+      type = "PULANG";
+      const updateRecord = await prisma.absensi.update({
+        where: { id: lastAbsen.id },
+        data: {
+          jam_keluar: new Date(),
+          status: "VALIDATING (15 Menit)",
+        },
+      });
+      absenId = updateRecord.id;
+      ctx.reply(
+        `👋 <b>ABSEN PULANG DICATAT</b>\n⏳ Mohon pertahankan Live Location selama ${MIN_DURASI_MENIT} menit untuk validasi.`,
+        { parse_mode: "HTML" },
+      );
+    } else {
+      return ctx.reply("✅ Anda sudah melakukan absensi lengkap hari ini.");
     }
-    else if (!absenHariIni.jam_keluar) {
-      const session = monitoringMap.get(telegramId);
-      
-      if (session) {
-        session.lastSeen = Date.now();
-        if (session.isInvalid) {
-            if (jarak <= radiusKantor) {
-               await prisma.absensi.update({ where: { id: session.attendanceId }, data: { status_kehadiran: session.originalStatus || "HADIR" } });
-               session.isInvalid = false;
-               ctx.reply("✅ Sinyal kembali. Status dipulihkan.");
-            }
-        }
-        monitoringMap.set(telegramId, session);
-      } else {
-        monitoringMap.set(telegramId, { 
-          attendanceId: absenHariIni.id,
-          startTime: Date.now(), 
-          lastSeen: Date.now(), 
-          warned: false, 
-          isInvalid: false, 
-          originalStatus: absenHariIni.status_kehadiran || "HADIR"
-        });
-      }
 
-      if (jarak > radiusKantor) {
-        ctx.reply(
-          `⚠️ <b>PERINGATAN!</b> Anda keluar area kantor (${jarak.toFixed(0)}m). Segera kembali!`,
-          { parse_mode: "HTML", reply_parameters: { message_id: msg.message_id } }
-        ).catch(() => {});
-      }
-    }
-    else {
-       monitoringMap.delete(telegramId);
-       ctx.stopMessageLiveLocation().catch(() => {});
-    }
-  } catch (error) {
-    console.error("Error:", error);
+    sessions.set(user.telegramId, {
+      userId: user.telegramId,
+      dbId: absenId,
+      startTime: Date.now(),
+      lastUpdate: Date.now(),
+      companyLat: user.company.latitude,
+      companyLong: user.company.longitude,
+      radius: user.company.radius,
+      type: type,
+      isInvalid: false,
+    });
+  } catch (err) {
+    console.error("Absen Start Error:", err);
+    ctx.reply("❌ Terjadi kesalahan sistem.");
   }
 });
 
-bot.launch().then(() => console.log("✅ Bot Siap!"));
+bot.on("edited_message", async (ctx) => {
+  const msg = ctx.editedMessage;
+  if (!msg || !("location" in msg) || !msg.location) return;
+
+  const telegramId = ctx.from.id.toString();
+  const session = sessions.get(telegramId);
+
+  if (!session || session.isInvalid) return;
+
+  const loc = msg.location;
+  const jarak = getDistance(
+    loc.latitude,
+    loc.longitude,
+    session.companyLat,
+    session.companyLong,
+  );
+
+  if (jarak > session.radius) {
+    session.isInvalid = true;
+    sessions.set(telegramId, session);
+
+    await prisma.absensi.update({
+      where: { id: session.dbId },
+      data: { status: "INVALID (KELUAR RADIUS)" },
+    });
+
+    return ctx.reply(
+      `⚠️ <b>PERINGATAN KERAS!</b>\nAnda keluar radius (${jarak.toFixed(0)}m).\nAbsensi dibatalkan & status menjadi <b>INVALID</b>.`,
+      { parse_mode: "HTML" },
+    );
+  }
+
+  session.lastUpdate = Date.now();
+  sessions.set(telegramId, session);
+});
+
+setInterval(async () => {
+  const now = Date.now();
+
+  for (const [telegramId, session] of sessions.entries()) {
+    if (session.isInvalid) {
+      sessions.delete(telegramId);
+      continue;
+    }
+
+    const durasiJalan = now - session.startTime;
+    const durasiDiam = now - session.lastUpdate;
+
+    if (durasiJalan >= MIN_DURASI_MENIT * 60 * 1000) {
+      await prisma.absensi.update({
+        where: { id: session.dbId },
+        data: { status: "VALID (VERIFIED)" },
+      });
+
+      bot.telegram
+        .sendMessage(
+          telegramId,
+          `✅ <b>VALIDASI SUKSES!</b>\n` +
+            `Terima kasih, lokasi Anda valid selama ${MIN_DURASI_MENIT} menit.\n` +
+            `Data telah tersimpan aman. Anda boleh mematikan Live Location sekarang.`,
+          { parse_mode: "HTML" },
+        )
+        .catch(() => {});
+
+      sessions.delete(telegramId);
+    } else if (durasiDiam > MAX_DIAM_DETIK * 1000) {
+      await prisma.absensi.update({
+        where: { id: session.dbId },
+        data: { status: "INVALID (LIVE MATI)" },
+      });
+
+      bot.telegram
+        .sendMessage(
+          telegramId,
+          `❌ <b>VALIDASI GAGAL!</b>\n` +
+            `Sistem tidak menerima update lokasi selama 2 menit.\n` +
+            `Kemungkinan Anda mematikan Live Location atau sinyal hilang.\n\n` +
+            `Status Absen: <b>INVALID</b>\nSilakan ulangi proses absen.`,
+          { parse_mode: "HTML" },
+        )
+        .catch(() => {});
+
+      sessions.delete(telegramId);
+    }
+  }
+}, CHECK_INTERVAL);
+
+bot.launch().then(() => console.log("✅ Bot Started!"));
+
 process.once("SIGINT", () => bot.stop("SIGINT"));
 process.once("SIGTERM", () => bot.stop("SIGTERM"));

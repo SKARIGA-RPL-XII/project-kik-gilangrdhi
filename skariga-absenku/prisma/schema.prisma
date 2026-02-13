@@ -47,8 +47,7 @@ model Absensi {
   lat_masuk    Float
   long_masuk   Float
   status       String    
-  status_kehadiran String?
-  telat_menit      Int?
+  telat_menit  Int?      @default(0)
 }
 
 model Jurnal {
