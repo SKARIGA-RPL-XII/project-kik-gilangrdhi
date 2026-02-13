@@ -12,10 +12,61 @@ interface ExtendedLocation {
   live_period?: number;
 }
 
+interface MonitoringSession {
+  attendanceId: number;
+  startTime: number;
+  lastSeen: number;
+  warned: boolean;
+  isInvalid: boolean;
+  originalStatus: string; 
+}
+
 const prisma = new PrismaClient();
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN as string);
+const monitoringMap = new Map<string, MonitoringSession>();
 
 console.log("🔄 Bot Telegram sedang berjalan...");
+
+setInterval(() => {
+  const now = Date.now();
+  
+  monitoringMap.forEach(async (session, userId) => {
+    const duration = now - session.startTime;
+    const silence = now - session.lastSeen;
+
+    if (duration >= 15 * 60 * 1000) {
+      if (!session.warned) {
+         bot.telegram.sendMessage(userId, "✅ <b>Waktu 15 Menit Tercapai.</b>\nTerima kasih, kehadiran Anda valid.", { parse_mode: "HTML" }).catch(() => {});
+      }
+      monitoringMap.delete(userId);
+      return;
+    }
+
+    if (silence > 20 * 1000 && !session.isInvalid) {
+      try {
+        await prisma.absensi.update({
+          where: { id: session.attendanceId },
+          data: { status_kehadiran: "INVALID (GPS MATI)" }
+        });
+
+        bot.telegram.sendMessage(
+          userId, 
+          "⚠️ <b>PERINGATAN KERAS!</b>\n\n" +
+          "Sinyal GPS Anda hilang > 20 detik.\n" +
+          "Status Absensi di Admin diubah menjadi: <b>INVALID (GPS MATI)</b>.\n\n" +
+          "Segera nyalakan Live Location atau ketik /masuk lagi untuk memulihkan status.", 
+          { parse_mode: "HTML" }
+        ).catch(() => {});
+        
+        session.isInvalid = true;
+        session.warned = true;
+        monitoringMap.set(userId, session);
+      } catch (e) {
+        console.error("Gagal update DB Invalid:", e);
+      }
+    }
+  });
+}, 5000);
 
 bot.use(async (ctx, next) => {
   if (!ctx.from) return next();
@@ -315,8 +366,12 @@ bot.on(["location", "edited_message"], async (ctx) => {
       orderBy: { jam_masuk: "desc" }
     });
 
-    if (!absenHariIni) {
-      if (jarak > radiusKantor) return; 
+    if (!absenHariIni || (absenHariIni && (absenHariIni.status_kehadiran || "").includes("INVALID") && jarak <= radiusKantor)) {
+      
+      if (jarak > radiusKantor) {
+         if (ctx.message && !absenHariIni) ctx.reply(`❌ Jarak terlalu jauh: ${jarak.toFixed(0)}m.`);
+         return; 
+      }
 
       const [targetJam, targetMenit] = (user.company.jam_masuk_kantor || "07:00").split(":").map(Number);
       const deadlineWIB = new Date(nowWIB); deadlineWIB.setUTCHours(targetJam, targetMenit, 0, 0);
@@ -329,27 +384,85 @@ bot.on(["location", "edited_message"], async (ctx) => {
         telatMenit = Math.floor((nowWIB.getTime() - deadlineWIB.getTime()) / 60000);
       }
 
-      await prisma.absensi.create({
-        data: {
-          userId: telegramId,
-          jam_masuk: nowUTC,
-          status: "HADIR",
-          lat_masuk: latitude,
-          long_masuk: longitude,
-          tanggal: nowUTC,
-          status_kehadiran: statusKehadiran,
-          telat_menit: telatMenit,
-        },
-      });
-      
-      let pesan = `✅ <b>ABSEN MASUK BERHASIL</b>\n`;
-      pesan += `🕒 ${nowWIB.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} WIB\n`;
-      pesan += `📍 Jarak: ${jarak.toFixed(0)}m\n\n`;
-      pesan += `⚠️ <b>JANGAN MATIKAN LIVE LOCATION!</b>\nSistem memantau posisi Anda.`;
-      
-      ctx.reply(pesan, { parse_mode: "HTML", reply_parameters: { message_id: msg.message_id } });
+      if (absenHariIni && (absenHariIni.status_kehadiran || "").includes("INVALID")) {
+        await prisma.absensi.update({
+          where: { id: absenHariIni.id },
+          data: { status_kehadiran: statusKehadiran }
+        });
+        
+        const session = monitoringMap.get(telegramId);
+        if (session) {
+           session.isInvalid = false;
+           session.lastSeen = Date.now();
+           monitoringMap.set(telegramId, session);
+        } else {
+           monitoringMap.set(telegramId, { 
+             attendanceId: absenHariIni.id,
+             startTime: Date.now(), 
+             lastSeen: Date.now(), 
+             warned: false, 
+             isInvalid: false,
+             originalStatus: statusKehadiran
+           });
+        }
+        
+        ctx.reply("✅ <b>GPS KEMBALI NORMAL!</b>\nStatus absensi dipulihkan menjadi Valid.", { parse_mode: "HTML", reply_parameters: { message_id: msg.message_id } });
+      } 
+      else {
+        const newAbsen = await prisma.absensi.create({
+          data: {
+            userId: telegramId,
+            jam_masuk: nowUTC,
+            status: "HADIR",
+            lat_masuk: latitude,
+            long_masuk: longitude,
+            tanggal: nowUTC,
+            status_kehadiran: statusKehadiran,
+            telat_menit: telatMenit,
+          },
+        });
+        
+        monitoringMap.set(telegramId, { 
+          attendanceId: newAbsen.id,
+          startTime: Date.now(), 
+          lastSeen: Date.now(), 
+          warned: false, 
+          isInvalid: false,
+          originalStatus: statusKehadiran
+        });
+
+        let pesan = `✅ <b>ABSEN MASUK BERHASIL</b>\n`;
+        pesan += `🕒 ${nowWIB.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} WIB\n`;
+        pesan += `📍 Jarak: ${jarak.toFixed(0)}m\n\n`;
+        pesan += `⚠️ <b>JANGAN MATIKAN LIVE LOCATION!</b>\nSistem memantau posisi Anda selama 15 menit.`;
+        
+        ctx.reply(pesan, { parse_mode: "HTML", reply_parameters: { message_id: msg.message_id } });
+      }
     }
     else if (!absenHariIni.jam_keluar) {
+      const session = monitoringMap.get(telegramId);
+      
+      if (session) {
+        session.lastSeen = Date.now();
+        if (session.isInvalid) {
+            if (jarak <= radiusKantor) {
+               await prisma.absensi.update({ where: { id: session.attendanceId }, data: { status_kehadiran: session.originalStatus || "HADIR" } });
+               session.isInvalid = false;
+               ctx.reply("✅ Sinyal kembali. Status dipulihkan.");
+            }
+        }
+        monitoringMap.set(telegramId, session);
+      } else {
+        monitoringMap.set(telegramId, { 
+          attendanceId: absenHariIni.id,
+          startTime: Date.now(), 
+          lastSeen: Date.now(), 
+          warned: false, 
+          isInvalid: false, 
+          originalStatus: absenHariIni.status_kehadiran || "HADIR"
+        });
+      }
+
       if (jarak > radiusKantor) {
         ctx.reply(
           `⚠️ <b>PERINGATAN!</b> Anda keluar area kantor (${jarak.toFixed(0)}m). Segera kembali!`,
@@ -358,6 +471,7 @@ bot.on(["location", "edited_message"], async (ctx) => {
       }
     }
     else {
+       monitoringMap.delete(telegramId);
        ctx.stopMessageLiveLocation().catch(() => {});
     }
   } catch (error) {
