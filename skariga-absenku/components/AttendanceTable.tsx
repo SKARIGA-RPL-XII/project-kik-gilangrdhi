@@ -1,14 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { 
-  MapPin, 
-  Calendar, 
-  Clock, 
-  User, 
-  AlertCircle, 
-  CheckCircle2, 
-  Map as MapIcon
+import {
+  MapPin,
+  Calendar,
+  Clock,
+  User,
+  AlertCircle,
+  CheckCircle2,
+  Map as MapIcon,
+  Timer,
+  XCircle
 } from "lucide-react";
 import { Modal, Tag } from "antd";
 import Pagination from "@/components/Pagination";
@@ -22,6 +24,7 @@ type AbsensiWithUser = {
   lat_masuk: number;
   long_masuk: number;
   status: string;
+  telat_menit: number;
   user: {
     nama: string | null;
   } | null;
@@ -46,6 +49,20 @@ export default function AttendanceTable({ data, totalItems, page, limit }: Atten
   const handleCloseDetail = () => {
     setIsModalOpen(false);
     setTimeout(() => setSelectedItem(null), 300);
+  };
+
+  const getSimpleStatus = (item: AbsensiWithUser) => {
+    const rawStatus = item.status ? item.status.toUpperCase() : "";
+    if (rawStatus.includes("INVALID")) {
+      return { label: "INVALID", color: "red", icon: <XCircle className="w-3.5 h-3.5" /> };
+    }
+    if (rawStatus.includes("VALIDATING")) {
+      return { label: "VALIDATING", color: "blue", icon: <Timer className="w-3.5 h-3.5" /> };
+    }
+    if (item.telat_menit > 0) {
+      return { label: "TERLAMBAT", color: "orange", icon: <AlertCircle className="w-3.5 h-3.5" /> };
+    }
+    return { label: "HADIR", color: "emerald", icon: <CheckCircle2 className="w-3.5 h-3.5" /> };
   };
 
   return (
@@ -78,9 +95,7 @@ export default function AttendanceTable({ data, totalItems, page, limit }: Atten
               </tr>
             ) : (
               data.map((item) => {
-                const statusRaw = item.status ? item.status.toUpperCase() : "UNKNOWN";
-                const isLate = statusRaw.includes("TERLAMBAT");
-                const isOnTime = statusRaw.includes("TEPAT") || statusRaw.includes("HADIR");
+                const status = getSimpleStatus(item);
 
                 return (
                   <tr key={item.id} className="hover:bg-sky-50/30 transition-colors group">
@@ -116,29 +131,26 @@ export default function AttendanceTable({ data, totalItems, page, limit }: Atten
                     </td>
 
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border shadow-sm ${
-                        isLate
-                          ? "bg-orange-50 text-orange-700 border-orange-200"
-                          : isOnTime
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                          : "bg-gray-50 text-gray-700 border-gray-200"
-                      }`}>
-                        {isLate && <AlertCircle className="w-3.5 h-3.5 text-orange-500" />}
-                        {isOnTime && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />}
-                        {!isLate && !isOnTime && <Clock className="w-3.5 h-3.5 text-gray-400" />}
-                        {item.status}
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border shadow-sm
+                        ${status.label === "INVALID" ? "bg-red-50 text-red-600 border-red-200" : ""}
+                        ${status.label === "VALIDATING" ? "bg-blue-50 text-blue-600 border-blue-200 animate-pulse" : ""}
+                        ${status.label === "TERLAMBAT" ? "bg-orange-50 text-orange-600 border-orange-200" : ""}
+                        ${status.label === "HADIR" ? "bg-emerald-50 text-emerald-600 border-emerald-200" : ""}
+                      `}>
+                        {status.icon}
+                        {status.label}
                       </span>
                     </td>
 
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2 text-xs bg-gray-50 px-2.5 py-1.5 rounded-lg border border-gray-100 w-fit text-gray-500 font-mono group-hover:border-gray-200 transition-colors">
                         <MapPin className="w-3 h-3 text-red-400" />
-                        <span>{item.lat_masuk.toFixed(4)}, {item.long_masuk.toFixed(4)}</span>
+                        <span>{Number(item.lat_masuk).toFixed(4)}, {Number(item.long_masuk).toFixed(4)}</span>
                       </div>
                     </td>
 
                     <td className="px-6 py-4 text-center">
-                      <button 
+                      <button
                         onClick={() => handleOpenDetail(item)}
                         className="text-sky-600 hover:text-sky-700 hover:bg-sky-50 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
                       >
@@ -170,7 +182,7 @@ export default function AttendanceTable({ data, totalItems, page, limit }: Atten
       >
         {selectedItem && (
           <div className="space-y-6 pt-4">
-            
+
             <div className="flex items-center gap-4 bg-sky-50 p-4 rounded-xl border border-sky-100">
               <div className="w-14 h-14 rounded-full bg-white flex items-center justify-center text-sky-600 text-xl font-bold shadow-sm">
                 {selectedItem.user?.nama ? selectedItem.user.nama.charAt(0).toUpperCase() : "?"}
@@ -189,12 +201,17 @@ export default function AttendanceTable({ data, totalItems, page, limit }: Atten
                   {new Date(selectedItem.tanggal).toLocaleDateString("id-ID", { dateStyle: 'long' })}
                 </div>
               </div>
-              
+
               <div className="space-y-1">
                 <p className="text-xs text-gray-400 uppercase font-semibold tracking-wider">Status</p>
-                <Tag color={selectedItem.status.includes("TERLAMBAT") ? "orange" : "success"} className="px-3 py-1 text-sm rounded-full">
-                  {selectedItem.status}
-                </Tag>
+                {(() => {
+                  const s = getSimpleStatus(selectedItem);
+                  return (
+                    <Tag color={s.color} className="px-3 py-1 text-sm rounded-full font-bold">
+                      {s.label}
+                    </Tag>
+                  )
+                })()}
               </div>
 
               <div className="space-y-1">
@@ -205,32 +222,32 @@ export default function AttendanceTable({ data, totalItems, page, limit }: Atten
                 </div>
               </div>
 
-               <div className="space-y-1">
+              <div className="space-y-1">
                 <p className="text-xs text-gray-400 uppercase font-semibold tracking-wider">Jam Keluar</p>
                 <div className="flex items-center gap-2 text-gray-700 font-medium">
                   <Clock className="w-4 h-4 text-red-400" />
-                  {selectedItem.jam_keluar 
-                    ? new Date(selectedItem.jam_keluar).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' }) 
+                  {selectedItem.jam_keluar
+                    ? new Date(selectedItem.jam_keluar).toLocaleTimeString("id-ID", { hour: '2-digit', minute: '2-digit' })
                     : "-"}
                 </div>
               </div>
             </div>
 
             <div className="space-y-2">
-               <p className="text-xs text-gray-400 uppercase font-semibold tracking-wider flex items-center gap-1">
-                  <MapIcon className="w-3.5 h-3.5" /> Lokasi Masuk
-               </p>
-               <div className="bg-gray-100 rounded-xl p-3 text-sm text-gray-600 font-mono border border-gray-200 flex justify-between items-center">
-                  <span>{selectedItem.lat_masuk}, {selectedItem.long_masuk}</span>
-                  <a 
-                    href={`https://www.google.com/maps/search/?api=1&query=${selectedItem.lat_masuk},${selectedItem.long_masuk}`} 
-                    target="_blank" 
-                    rel="noreferrer"
-                    className="text-sky-600 hover:underline text-xs font-semibold"
-                  >
-                    Buka di Maps ↗
-                  </a>
-               </div>
+              <p className="text-xs text-gray-400 uppercase font-semibold tracking-wider flex items-center gap-1">
+                <MapIcon className="w-3.5 h-3.5" /> Lokasi Masuk
+              </p>
+              <div className="bg-gray-100 rounded-xl p-3 text-sm text-gray-600 font-mono border border-gray-200 flex justify-between items-center">
+                <span>{selectedItem.lat_masuk}, {selectedItem.long_masuk}</span>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${selectedItem.lat_masuk},${selectedItem.long_masuk}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-sky-600 hover:underline text-xs font-semibold flex items-center gap-1"
+                >
+                  Buka di Maps ↗
+                </a>
+              </div>
             </div>
 
           </div>

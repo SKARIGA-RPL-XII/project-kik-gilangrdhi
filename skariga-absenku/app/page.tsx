@@ -129,7 +129,7 @@ export default async function Dashboard() {
                           ) : (
                             <>
                               <CheckCircle className="w-3.5 h-3.5" />
-                              Tepat Waktu
+                              Hadir
                             </>
                           )}
                         </span>
