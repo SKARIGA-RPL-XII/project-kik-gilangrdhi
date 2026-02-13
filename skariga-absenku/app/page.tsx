@@ -1,5 +1,5 @@
 import { prisma } from "@/src/lib/db";
-import { Users, UserCheck, Clock, MapPin, Calendar, CheckCircle, AlertCircle } from "lucide-react";
+import { Users, UserCheck, Clock, MapPin, Calendar, CheckCircle, XCircle } from "lucide-react";
 import StatsCard from "@/components/StatsCard";
 import Link from "next/link";
 
@@ -23,7 +23,7 @@ export default async function Dashboard() {
   const terlambat = await prisma.absensi.count({
     where: {
       jam_masuk: { gte: todayStart, lte: todayEnd },
-      status: "TERLAMBAT",
+      status: { contains: "TERLAMBAT" }, 
     },
   });
 
@@ -70,6 +70,7 @@ export default async function Dashboard() {
           <StatsCard title="Terlambat" value={terlambat} icon={Clock} color="orange" />
           <StatsCard title="Lokasi Kantor" value={totalKantor} icon={MapPin} color="red" />
         </div>
+
         <div className="bg-white/90 backdrop-blur-sm rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-linear-to-r from-gray-50 to-white/50">
             <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
@@ -105,40 +106,46 @@ export default async function Dashboard() {
                     </td>
                   </tr>
                 ) : (
-                  recentAbsensi.map((item) => (
-                    <tr key={item.id} className="hover:bg-sky-50/30 transition-colors group">
-                      <td className="px-6 py-4 font-medium text-gray-900 group-hover:text-sky-700 transition-colors">
-                        {item.user?.nama || "Tanpa Nama"}
-                      </td>
-                      <td className="px-6 py-4 text-gray-500 font-mono">
-                        {new Date(item.jam_masuk).toLocaleTimeString("id-ID", {
-                          hour: "2-digit", minute: "2-digit",
-                        })}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
-                          item.status === "TERLAMBAT"
-                            ? "bg-orange-100 text-orange-700 border-orange-200"
-                            : "bg-green-100 text-green-700 border-green-200"
-                        }`}>
-                          {item.status === "TERLAMBAT" ? (
-                            <>
-                              <AlertCircle className="w-3.5 h-3.5" />
-                              Terlambat
-                            </>
-                          ) : (
-                            <>
-                              <CheckCircle className="w-3.5 h-3.5" />
-                              Hadir
-                            </>
-                          )}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-gray-400 text-xs font-mono">
-                        {item.userId}
-                      </td>
-                    </tr>
-                  ))
+                  recentAbsensi.map((item) => {
+                    const rawStatus = item.status || "";
+                    const status = rawStatus.toUpperCase();
+                    
+                    let badgeClass = "bg-green-100 text-green-700 border-green-200";
+                    let IconComponent = CheckCircle;
+                    let statusText = "Hadir"; 
+
+                    if (status.includes("INVALID") || status.includes("GPS MATI")) {
+                      badgeClass = "bg-red-100 text-red-700 border-red-200";
+                      IconComponent = XCircle;
+                      statusText = "Invalid";
+                    } else {
+                      badgeClass = "bg-green-100 text-green-700 border-green-200";
+                      IconComponent = CheckCircle;
+                      statusText = "Hadir";
+                    }
+
+                    return (
+                      <tr key={item.id} className="hover:bg-sky-50/30 transition-colors group">
+                        <td className="px-6 py-4 font-medium text-gray-900 group-hover:text-sky-700 transition-colors">
+                          {item.user?.nama || "Tanpa Nama"}
+                        </td>
+                        <td className="px-6 py-4 text-gray-500 font-mono">
+                          {item.jam_masuk ? new Date(item.jam_masuk).toLocaleTimeString("id-ID", {
+                            hour: "2-digit", minute: "2-digit",
+                          }) : "-"}
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${badgeClass}`}>
+                            <IconComponent className="w-3.5 h-3.5" />
+                            {statusText}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-gray-400 text-xs font-mono">
+                          {item.user?.telegramId || item.userId}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
