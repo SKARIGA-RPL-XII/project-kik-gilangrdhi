@@ -108,7 +108,9 @@ export default async function Dashboard() {
                   recentAbsensi.map((item) => (
                     <tr key={item.id} className="hover:bg-sky-50/30 transition-colors group">
                       <td className="px-6 py-4 font-medium text-gray-900 group-hover:text-sky-700 transition-colors">
-                        {item.user?.nama || "Tanpa Nama"}
+                        <Link href="/attendance" className="hover:underline hover:text-sky-600">
+                            {item.user?.nama || "Tanpa Nama"}
+                        </Link>
                       </td>
                       <td className="px-6 py-4 text-gray-500 font-mono">
                         {new Date(item.jam_masuk).toLocaleTimeString("id-ID", {

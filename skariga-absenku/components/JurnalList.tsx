@@ -9,6 +9,7 @@ import { Modal, message, Select, ConfigProvider, Popconfirm, DatePicker } from "
 import { approveJurnal, deleteJurnal } from "@/app/actions/jurnal";
 import dayjs from "dayjs";
 import 'dayjs/locale/id';
+import Link from "next/link";
 
 dayjs.locale('id');
 
@@ -76,7 +77,6 @@ export default function JurnalList({ jurnals }: { jurnals: JurnalData[] }) {
             {contextHolder}
 
             <div className="space-y-6">
-                {/* TOOLBAR FILTER RAMPING */}
                 <div className="flex flex-wrap items-center gap-4 bg-white px-5 py-3 rounded-xl border border-gray-100 shadow-xs">
                     <div className="flex items-center gap-2">
                         <Filter size={14} className="text-gray-400" />
@@ -137,8 +137,22 @@ export default function JurnalList({ jurnals }: { jurnals: JurnalData[] }) {
                                                     {item.user.nama ? item.user.nama.charAt(0).toUpperCase() : <User size={16} />}
                                                 </div>
                                                 <div>
-                                                    <h3 className="font-bold text-gray-800 text-sm">{item.user.nama || "Tanpa Nama"}</h3>
-                                                    <p className="text-[11px] text-gray-400 truncate max-w-30">{item.user.company?.nama || "Belum ada kantor"}</p>
+                                                    <Link 
+                                                        href={`/users?q=${item.user.nama || ""}`}
+                                                        className="font-bold text-gray-800 text-sm hover:text-sky-600 hover:underline block"
+                                                    >
+                                                        {item.user.nama || "Tanpa Nama"}
+                                                    </Link>
+                                                    {item.user.company ? (
+                                                        <Link 
+                                                            href={`/company?q=${item.user.company.nama}`}
+                                                            className="text-[11px] text-gray-400 truncate max-w-30 hover:text-sky-500 hover:underline block"
+                                                        >
+                                                            {item.user.company.nama}
+                                                        </Link>
+                                                    ) : (
+                                                        <p className="text-[11px] text-gray-400 truncate max-w-30">Belum ada kantor</p>
+                                                    )}
                                                 </div>
                                             </div>
                                             {item.is_approved ? (

@@ -6,8 +6,8 @@ import path from "path";
 import axios from "axios";
 
 const MIN_DURASI_MENIT = 15;
-const MAX_DIAM_DETIK = 120;
-const CHECK_INTERVAL = 30000;
+const MAX_DIAM_DETIK = 60;
+const CHECK_INTERVAL = 3000;
 
 interface LiveSession {
   userId: string;
@@ -29,15 +29,19 @@ interface ExtendedLocation {
 }
 
 const sessions = new Map<string, LiveSession>();
+const userIntents = new Map<string, "MASUK" | "PULANG">();
 const prisma = new PrismaClient();
 const bot = new Telegraf(process.env.TELEGRAM_BOT_TOKEN as string);
 
-console.log("🚀 Bot Absensi High-Performance Siap!");
+console.log("🚀 Bot Absensi Ultimate Ready!");
 
 bot.use(async (ctx, next) => {
   if (!ctx.from) return next();
   const text = ctx.message && "text" in ctx.message ? ctx.message.text : "";
-  if (text.startsWith("/start") || text.startsWith("/bantuan")) return next();
+  
+  if (text.startsWith("/start") || text.startsWith("/bantuan") || text.startsWith("/daftar")) {
+    return next();
+  }
 
   try {
     const user = await prisma.user.findUnique({
@@ -45,7 +49,7 @@ bot.use(async (ctx, next) => {
       include: { company: true },
     });
 
-    if (!user) return ctx.reply("⛔ Akses Ditolak. Anda belum terdaftar.");
+    if (!user) return ctx.reply("⛔ Akses Ditolak. Anda belum terdaftar. Silakan ketik /daftar [email] untuk mendaftar.");
     ctx.state.user = user;
     return next();
   } catch (err) {
@@ -409,17 +413,22 @@ bot.on("text", async (ctx, next) => {
   next();
 });
 
-bot.command(["masuk", "pulang"], (ctx) => {
+bot.command("masuk", (ctx) => {
+  userIntents.set(ctx.from.id.toString(), "MASUK");
   ctx.reply(
-    `📍 <b>INSTRUKSI ABSENSI</b>\n\n` +
-      `1. Klik 📎 (Klip Kertas) di pojok kiri bawah.\n` +
-      `2. Pilih menu 📍 <b>Location</b>.\n` +
-      `3. Pilih <b>'Share My Live Location for...'</b>\n` +
-      `4. Pilih durasi <b>15 Menit</b> (Minimal).\n\n` +
-      `⚠️ <b>PENTING:</b>\n` +
-      `- Jangan matikan Live Location sebelum ${MIN_DURASI_MENIT} menit berakhir.\n` +
-      `- Jangan keluar dari area kantor.\n` +
-      `- Jika melanggar, absen otomatis <b>INVALID</b>.`,
+    `📍 <b>ABSEN MASUK</b>\n\n` +
+      `Silakan kirim <b>Live Location</b> sekarang.\n` +
+      `Pilih 📎 (Klip) > Location > <b>Share My Live Location</b>.`,
+    { parse_mode: "HTML" },
+  );
+});
+
+bot.command("pulang", (ctx) => {
+  userIntents.set(ctx.from.id.toString(), "PULANG");
+  ctx.reply(
+    `📍 <b>ABSEN PULANG</b>\n\n` +
+      `Silakan kirim <b>Live Location</b> sekarang.\n` +
+      `Pilih 📎 (Klip) > Location > <b>Share My Live Location</b>.`,
     { parse_mode: "HTML" },
   );
 });
@@ -429,6 +438,15 @@ bot.on("location", async (ctx) => {
   const msg = ctx.message;
   const loc = msg.location;
   const extLoc = loc as ExtendedLocation;
+  const intent = userIntents.get(user.telegramId);
+
+  if (!intent) {
+    return ctx.reply(
+      "⚠️ <b>Perintah Belum Jelas</b>\n" +
+      "Silakan ketik <code>/masuk</code> atau <code>/pulang</code> terlebih dahulu sebelum mengirim lokasi.",
+      { parse_mode: "HTML" }
+    );
+  }
 
   if (!("live_period" in extLoc)) {
     return ctx.reply(
@@ -462,9 +480,12 @@ bot.on("location", async (ctx) => {
     });
 
     let absenId = 0;
-    let type: "MASUK" | "PULANG" = "MASUK";
+    
+    if (intent === "MASUK") {
+      if (lastAbsen && !lastAbsen.status.includes("INVALID")) {
+        return ctx.reply("⚠️ Anda sudah melakukan absen masuk hari ini.");
+      }
 
-    if (!lastAbsen) {
       const [tJam, tMenit] = (user.company.jam_masuk_kantor || "07:00")
         .split(":")
         .map(Number);
@@ -472,29 +493,53 @@ bot.on("location", async (ctx) => {
       target.setHours(tJam, tMenit, 0, 0);
 
       let telat = 0;
-
       if (new Date() > target) {
         telat = Math.floor((new Date().getTime() - target.getTime()) / 60000);
       }
 
-      const newRecord = await prisma.absensi.create({
-        data: {
-          userId: user.telegramId,
-          jam_masuk: new Date(),
-          tanggal: new Date(),
-          lat_masuk: loc.latitude,
-          long_masuk: loc.longitude,
-          status: "VALIDATING (15 Menit)",
-          telat_menit: telat,
-        },
-      });
-      absenId = newRecord.id;
-      ctx.reply(
-        `✅ <b>ABSEN MASUK DICATAT</b>\n⏳ Mohon pertahankan Live Location selama ${MIN_DURASI_MENIT} menit untuk validasi.`,
-        { parse_mode: "HTML" },
-      );
-    } else if (!lastAbsen.jam_keluar) {
-      type = "PULANG";
+      if (lastAbsen && lastAbsen.status.includes("INVALID")) {
+        const updateRecord = await prisma.absensi.update({
+          where: { id: lastAbsen.id },
+          data: {
+            jam_masuk: new Date(),
+            lat_masuk: loc.latitude,
+            long_masuk: loc.longitude,
+            status: "VALIDATING (15 Menit)",
+            telat_menit: telat,
+          },
+        });
+        absenId = updateRecord.id;
+        ctx.reply(
+          `✅ <b>ABSEN MASUK (ULANG) DICATAT</b>\n⏳ Pertahankan Live Location selama ${MIN_DURASI_MENIT} menit.`,
+          { parse_mode: "HTML" },
+        );
+      } else {
+        const newRecord = await prisma.absensi.create({
+          data: {
+            userId: user.telegramId,
+            jam_masuk: new Date(),
+            tanggal: new Date(),
+            lat_masuk: loc.latitude,
+            long_masuk: loc.longitude,
+            status: "VALIDATING (15 Menit)",
+            telat_menit: telat,
+          },
+        });
+        absenId = newRecord.id;
+        ctx.reply(
+          `✅ <b>ABSEN MASUK DICATAT</b>\n⏳ Pertahankan Live Location selama ${MIN_DURASI_MENIT} menit.`,
+          { parse_mode: "HTML" },
+        );
+      }
+    } else if (intent === "PULANG") {
+      if (!lastAbsen) {
+        return ctx.reply("⚠️ Anda belum melakukan absen masuk hari ini.");
+      }
+      
+      if (lastAbsen.jam_keluar && !lastAbsen.status.includes("INVALID")) {
+        return ctx.reply("✅ Anda sudah absen pulang hari ini.");
+      }
+
       const updateRecord = await prisma.absensi.update({
         where: { id: lastAbsen.id },
         data: {
@@ -504,11 +549,9 @@ bot.on("location", async (ctx) => {
       });
       absenId = updateRecord.id;
       ctx.reply(
-        `👋 <b>ABSEN PULANG DICATAT</b>\n⏳ Mohon pertahankan Live Location selama ${MIN_DURASI_MENIT} menit untuk validasi.`,
+        `👋 <b>ABSEN PULANG DICATAT</b>\n⏳ Pertahankan Live Location selama ${MIN_DURASI_MENIT} menit.`,
         { parse_mode: "HTML" },
       );
-    } else {
-      return ctx.reply("✅ Anda sudah melakukan absensi lengkap hari ini.");
     }
 
     sessions.set(user.telegramId, {
@@ -519,9 +562,12 @@ bot.on("location", async (ctx) => {
       companyLat: user.company.latitude,
       companyLong: user.company.longitude,
       radius: user.company.radius,
-      type: type,
+      type: intent,
       isInvalid: false,
     });
+    
+    userIntents.delete(user.telegramId);
+
   } catch (err) {
     console.error("Absen Start Error:", err);
     ctx.reply("❌ Terjadi kesalahan sistem.");
@@ -555,7 +601,10 @@ bot.on("edited_message", async (ctx) => {
     });
 
     return ctx.reply(
-      `⚠️ <b>PERINGATAN KERAS!</b>\nAnda keluar radius (${jarak.toFixed(0)}m).\nAbsensi dibatalkan & status menjadi <b>INVALID</b>.`,
+      `⚠️ <b>PERINGATAN: KELUAR RADIUS!</b>\n` +
+      `Jarak: ${jarak.toFixed(0)}m (Max: ${session.radius}m).\n` +
+      `Absensi dibatalkan.\n\n` +
+      `🔄 <b>Silakan ketik /${session.type.toLowerCase()} lagi</b> untuk mengulang.`,
       { parse_mode: "HTML" },
     );
   }
@@ -603,9 +652,8 @@ setInterval(async () => {
         .sendMessage(
           telegramId,
           `❌ <b>VALIDASI GAGAL!</b>\n` +
-            `Sistem tidak menerima update lokasi selama 2 menit.\n` +
-            `Kemungkinan Anda mematikan Live Location atau sinyal hilang.\n\n` +
-            `Status Absen: <b>INVALID</b>\nSilakan ulangi proses absen.`,
+            `Sinyal hilang atau Live Location dimatikan sebelum 15 menit.\n\n` +
+            `🔄 <b>Silakan ketik /${session.type.toLowerCase()} lagi</b> untuk mengulang.`,
           { parse_mode: "HTML" },
         )
         .catch(() => {});
