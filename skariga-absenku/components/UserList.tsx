@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { Modal, Button, Form, message, Select, Tag, Tabs, ConfigProvider, Popconfirm } from "antd";
 import { approveUser, rejectUser, updateUserCompany } from "@/app/actions/user";
+import Link from "next/link";
 
 interface Company {
   id: number;
@@ -97,7 +98,16 @@ const UserTable = ({
                   <div className="flex items-center gap-2 text-gray-600">
                     <Building2 size={16} className={user.company ? "text-orange-400" : "text-gray-300"} />
                     <span className="font-medium">
-                      {user.company?.nama || <span className="text-gray-400 italic">Belum diset</span>}
+                      {user.company ? (
+                        <Link 
+                          href={`/company?q=${user.company.nama}`}
+                          className="hover:text-sky-600 hover:underline transition-all"
+                        >
+                          {user.company.nama}
+                        </Link>
+                      ) : (
+                        <span className="text-gray-400 italic">Belum diset</span>
+                      )}
                     </span>
                   </div>
                 </td>

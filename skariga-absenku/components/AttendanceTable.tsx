@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Modal, Tag } from "antd";
 import Pagination from "@/components/Pagination";
+import Link from "next/link";
 
 type AbsensiWithUser = {
   id: number;
@@ -105,9 +106,12 @@ export default function AttendanceTable({ data, totalItems, page, limit }: Atten
                           {item.user?.nama ? item.user.nama.charAt(0).toUpperCase() : <User className="w-5 h-5" />}
                         </div>
                         <div>
-                          <p className="font-medium text-gray-900 group-hover:text-sky-600 transition-colors">
+                          <Link 
+                            href={`/users?q=${item.user?.nama || ""}`}
+                            className="font-medium text-gray-900 group-hover:text-sky-600 transition-colors hover:underline block"
+                          >
                             {item.user?.nama || "Tanpa Nama"}
-                          </p>
+                          </Link>
                           <p className="text-xs text-gray-400 font-mono">{item.userId}</p>
                         </div>
                       </div>
