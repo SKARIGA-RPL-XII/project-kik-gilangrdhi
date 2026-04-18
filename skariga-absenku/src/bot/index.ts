@@ -38,8 +38,12 @@ console.log("🚀 Bot Absensi Ultimate Ready!");
 bot.use(async (ctx, next) => {
   if (!ctx.from) return next();
   const text = ctx.message && "text" in ctx.message ? ctx.message.text : "";
-  
-  if (text.startsWith("/start") || text.startsWith("/bantuan") || text.startsWith("/daftar")) {
+
+  if (
+    text.startsWith("/start") ||
+    text.startsWith("/bantuan") ||
+    text.startsWith("/daftar")
+  ) {
     return next();
   }
 
@@ -49,7 +53,10 @@ bot.use(async (ctx, next) => {
       include: { company: true },
     });
 
-    if (!user) return ctx.reply("⛔ Akses Ditolak. Anda belum terdaftar. Silakan ketik /daftar [email] untuk mendaftar.");
+    if (!user)
+      return ctx.reply(
+        "⛔ Akses Ditolak. Anda belum terdaftar. Silakan ketik /daftar [email] untuk mendaftar.",
+      );
     ctx.state.user = user;
     return next();
   } catch (err) {
@@ -443,8 +450,8 @@ bot.on("location", async (ctx) => {
   if (!intent) {
     return ctx.reply(
       "⚠️ <b>Perintah Belum Jelas</b>\n" +
-      "Silakan ketik <code>/masuk</code> atau <code>/pulang</code> terlebih dahulu sebelum mengirim lokasi.",
-      { parse_mode: "HTML" }
+        "Silakan ketik <code>/masuk</code> atau <code>/pulang</code> terlebih dahulu sebelum mengirim lokasi.",
+      { parse_mode: "HTML" },
     );
   }
 
@@ -480,7 +487,7 @@ bot.on("location", async (ctx) => {
     });
 
     let absenId = 0;
-    
+
     if (intent === "MASUK") {
       if (lastAbsen && !lastAbsen.status.includes("INVALID")) {
         return ctx.reply("⚠️ Anda sudah melakukan absen masuk hari ini.");
@@ -535,7 +542,7 @@ bot.on("location", async (ctx) => {
       if (!lastAbsen) {
         return ctx.reply("⚠️ Anda belum melakukan absen masuk hari ini.");
       }
-      
+
       if (lastAbsen.jam_keluar && !lastAbsen.status.includes("INVALID")) {
         return ctx.reply("✅ Anda sudah absen pulang hari ini.");
       }
@@ -565,9 +572,8 @@ bot.on("location", async (ctx) => {
       type: intent,
       isInvalid: false,
     });
-    
-    userIntents.delete(user.telegramId);
 
+    userIntents.delete(user.telegramId);
   } catch (err) {
     console.error("Absen Start Error:", err);
     ctx.reply("❌ Terjadi kesalahan sistem.");
@@ -578,12 +584,15 @@ bot.on("edited_message", async (ctx) => {
   const msg = ctx.editedMessage;
   if (!msg || !("location" in msg) || !msg.location) return;
 
-  const telegramId = ctx.from.id.toString();
+  const telegramId = ctx.from?.id.toString();
+  if (!telegramId) return;
+
   const session = sessions.get(telegramId);
 
   if (!session || session.isInvalid) return;
 
   const loc = msg.location;
+
   const jarak = getDistance(
     loc.latitude,
     loc.longitude,
@@ -601,11 +610,14 @@ bot.on("edited_message", async (ctx) => {
     });
 
     return ctx.reply(
-      `⚠️ <b>PERINGATAN: KELUAR RADIUS!</b>\n` +
-      `Jarak: ${jarak.toFixed(0)}m (Max: ${session.radius}m).\n` +
-      `Absensi dibatalkan.\n\n` +
-      `🔄 <b>Silakan ketik /${session.type.toLowerCase()} lagi</b> untuk mengulang.`,
-      { parse_mode: "HTML" },
+      `⚠️ <b>PERINGATAN: ANDA KELUAR RADIUS KANTOR!</b>\n` +
+        `Jarak Anda saat ini: ${jarak.toFixed(0)}m (Maksimal: ${session.radius}m).\n\n` +
+        `❌ <b>Proses absensi dibatalkan otomatis.</b>\n` +
+        `🔄 <b>Silakan kembali ke dalam area kantor dan ketik /${session.type.toLowerCase()} untuk mengulang absen dari awal.</b>`,
+      {
+        parse_mode: "HTML",
+        reply_parameters: { message_id: msg.message_id },
+      },
     );
   }
 
