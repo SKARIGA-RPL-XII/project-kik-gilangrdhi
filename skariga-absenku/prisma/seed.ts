@@ -70,7 +70,6 @@ async function main() {
   }
   console.log(`🏢 ${createdCompanies.length} Perusahaan dibuat.`);
 
-  // 4. Buat Siswa Dummy
   for (let i = 0; i < 25; i++) {
     const firstName = faker.person.firstName();
     const lastName = faker.person.lastName();
@@ -78,7 +77,6 @@ async function main() {
     const telegramId = faker.string.numeric(9);
     const email = faker.internet.email({ firstName, lastName }).toLowerCase();
 
-    // Pilih perusahaan random
     const randomCompany =
       createdCompanies[Math.floor(Math.random() * createdCompanies.length)];
 
@@ -126,7 +124,7 @@ async function main() {
           userId: user.telegramId,
           tanggal: date,
           jam_masuk: jamMasuk,
-          jam_keluar: new Date(jamMasuk.getTime() + 8 * 60 * 60 * 1000), // Pulang 8 jam kemudian
+          jam_keluar: new Date(jamMasuk.getTime() + 8 * 60 * 60 * 1000),
           lat_masuk: lat,
           long_masuk: long,
           status: status,
