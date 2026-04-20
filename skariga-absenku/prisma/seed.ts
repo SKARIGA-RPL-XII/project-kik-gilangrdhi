@@ -62,6 +62,7 @@ async function main() {
         longitude: comp.long,
         radius: 100,
         deskripsi: "Tempat magang siswa jurusan RPL dan TKJ.",
+        sosmedia: "https://www.instagram.com/skariga_official/",
         jam_masuk_kantor: "07:00",
         jam_pulang_kantor: "15:00",
       },

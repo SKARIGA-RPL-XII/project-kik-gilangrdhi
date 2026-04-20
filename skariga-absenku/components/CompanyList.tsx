@@ -15,6 +15,7 @@ interface Company {
   id: number;
   nama: string;
   deskripsi: string | null;
+  sosmedia: string | null;
   alamat: string | null;
   latitude: number;
   longitude: number;
@@ -27,6 +28,7 @@ interface Company {
 interface CompanyFormValues {
   nama: string;
   deskripsi?: string;
+  sosmedia?: string;
   alamat: string;
   radius: string | number;
   jam_masuk: Dayjs; 
@@ -40,7 +42,7 @@ export default function CompanyList({ companies }: { companies: Company[] }) {
   const [messageApi, contextHolder] = message.useMessage();
 
   const defaultLat = -7.952086;
-  const defaultLng = 112.612502;
+  const defaultLng = 112.612502;  
 
   const [tempLat, setTempLat] = useState(defaultLat);
   const [tempLng, setTempLng] = useState(defaultLng);
@@ -72,6 +74,7 @@ export default function CompanyList({ companies }: { companies: Company[] }) {
     form.setFieldsValue({
       nama: company.nama,
       deskripsi: company.deskripsi,
+      sosmedia: company.sosmedia,
       alamat: company.alamat,
       radius: company.radius,
       jam_masuk: dayjs(company.jam_masuk_kantor || '07:00', 'HH:mm'),
@@ -84,6 +87,7 @@ export default function CompanyList({ companies }: { companies: Company[] }) {
     const payload = {
       nama: values.nama,
       deskripsi: values.deskripsi,
+      sosmedia: values.sosmedia,
       alamat: values.alamat,
       latitude: tempLat,
       longitude: tempLng,
@@ -183,6 +187,19 @@ export default function CompanyList({ companies }: { companies: Company[] }) {
                   <p className="text-gray-500 text-sm mt-1 line-clamp-2">{company.deskripsi || "Tidak ada deskripsi."}</p>
                 </div>
 
+                <div>
+                  {company.sosmedia && (
+                    <a 
+                      href={company.sosmedia}
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-500 hover:text-blue-700 underline"
+                    >
+                      Media Sosial
+                    </a>
+                  )}
+                </div>
+
                 <div className="space-y-3">
                    <div className="flex items-center gap-3 text-sm text-gray-600 bg-sky-50 p-2 rounded-lg border border-sky-100">
                       <Clock className="w-4 h-4 text-sky-500 shrink-0" />
@@ -243,6 +260,10 @@ export default function CompanyList({ companies }: { companies: Company[] }) {
 
             <Form.Item name="deskripsi" label="Deskripsi Singkat">
               <Input.TextArea rows={2} placeholder="Keterangan singkat tentang perusahaan..." />
+            </Form.Item>
+
+            <Form.Item name="sosmedia" label="Link Media Sosial">
+              <Input size="large" placeholder="https://www.instagram.com/..." />
             </Form.Item>
 
             <Form.Item name="alamat" label="Alamat Lengkap" rules={[{ required: true, message: 'Wajib diisi' }]}>
