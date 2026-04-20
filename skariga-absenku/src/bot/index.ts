@@ -5,15 +5,16 @@ import fs from "fs";
 import path from "path";
 import axios from "axios";
 
-const MIN_DURASI_MENIT = 15;
-const MAX_DIAM_DETIK = 60;
-const CHECK_INTERVAL = 3000;
+const MIN_DURASI_DETIK = 30;
+const CHECK_INTERVAL = 2000;
 
 interface LiveSession {
   userId: string;
   dbId: number;
   startTime: number;
   lastUpdate: number;
+  currentLat: number;
+  currentLong: number;
   companyLat: number;
   companyLong: number;
   radius: number;
@@ -73,16 +74,16 @@ bot.command(["start", "mulai"], (ctx) =>
 bot.command("bantuan", (ctx) => {
   ctx.reply(
     `🛠️ <b>PANDUAN PENGGUNAAN</b>\n\n` +
-      `<code>/daftar</code> - Mendaftarkan Akun\n\n` +
+      `/daftar - Mendaftarkan Akun\n\n` +
       `📍 <b>Absensi (Wajib Live Location)</b>\n` +
-      `<code>/masuk</code> - Panduan Absen Masuk\n` +
-      `<code>/pulang</code> - Panduan Absen Pulang\n\n` +
+      `/masuk - Panduan Absen Masuk\n` +
+      `/pulang - Panduan Absen Pulang\n\n` +
       `📝 <b>Jurnal PKL</b>\n` +
       `<b>Upload:</b> Kirim FOTO + CAPTION langsung.\n` +
-      `<code>/jurnal</code> - Lihat & Kelola Jurnal (Edit/Hapus)\n\n` +
+      `/jurnal - Lihat & Kelola Jurnal (Edit/Hapus)\n\n` +
       `📂 <b>Akun</b>\n` +
-      `<code>/rekap</code> - Cek Rekap Absensi Bulanan\n` +
-      `<code>/profil</code> - Cek Data Diri & Status`,
+      `/rekap - Cek Rekap Absensi Bulanan\n` +
+      `/profil - Cek Data Diri & Status`,
     { parse_mode: "HTML" },
   );
 });
@@ -511,13 +512,13 @@ bot.on("location", async (ctx) => {
             jam_masuk: new Date(),
             lat_masuk: loc.latitude,
             long_masuk: loc.longitude,
-            status: "VALIDATING (15 Menit)",
+            status: "VALIDATING (30 Detik)",
             telat_menit: telat,
           },
         });
         absenId = updateRecord.id;
         ctx.reply(
-          `✅ <b>ABSEN MASUK (ULANG) DICATAT</b>\n⏳ Pertahankan Live Location selama ${MIN_DURASI_MENIT} menit.`,
+          `✅ <b>ABSEN MASUK (ULANG) DICATAT</b>\n⏳ Pertahankan Live Location selama ${MIN_DURASI_DETIK} detik.`,
           { parse_mode: "HTML" },
         );
       } else {
@@ -528,13 +529,13 @@ bot.on("location", async (ctx) => {
             tanggal: new Date(),
             lat_masuk: loc.latitude,
             long_masuk: loc.longitude,
-            status: "VALIDATING (15 Menit)",
+            status: "VALIDATING (30 Detik)",
             telat_menit: telat,
           },
         });
         absenId = newRecord.id;
         ctx.reply(
-          `✅ <b>ABSEN MASUK DICATAT</b>\n⏳ Pertahankan Live Location selama ${MIN_DURASI_MENIT} menit.`,
+          `✅ <b>ABSEN MASUK DICATAT</b>\n⏳ Pertahankan Live Location selama ${MIN_DURASI_DETIK} detik.`,
           { parse_mode: "HTML" },
         );
       }
@@ -547,16 +548,32 @@ bot.on("location", async (ctx) => {
         return ctx.reply("✅ Anda sudah absen pulang hari ini.");
       }
 
+      const jamPulangKantor = user.company.jam_pulang_kantor || "15:00";
+      const [pJam, pMenit] = jamPulangKantor.split(":").map(Number);
+
+      const targetPulang = new Date();
+      targetPulang.setHours(pJam, pMenit, 0, 0);
+
+      if (new Date() < targetPulang) {
+        return ctx.reply(
+          `⛔ <b>BELUM WAKTUNYA PULANG!</b>\n` +
+            `Jam pulang kantor Anda ditetapkan pukul <b>${jamPulangKantor}</b>.\n` +
+            `Saat ini masih pukul ${new Date().toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}.\n` +
+            `❌ <b>Absen ditolak otomatis.</b>`,
+          { parse_mode: "HTML" },
+        );
+      }
+
       const updateRecord = await prisma.absensi.update({
         where: { id: lastAbsen.id },
         data: {
           jam_keluar: new Date(),
-          status: "VALIDATING (15 Menit)",
+          status: "VALIDATING (35 Detik)",
         },
       });
       absenId = updateRecord.id;
       ctx.reply(
-        `👋 <b>ABSEN PULANG DICATAT</b>\n⏳ Pertahankan Live Location selama ${MIN_DURASI_MENIT} menit.`,
+        `👋 <b>ABSEN PULANG DICATAT</b>\n⏳ Pertahankan Live Location selama ${MIN_DURASI_DETIK} detik.`,
         { parse_mode: "HTML" },
       );
     }
@@ -566,6 +583,8 @@ bot.on("location", async (ctx) => {
       dbId: absenId,
       startTime: Date.now(),
       lastUpdate: Date.now(),
+      currentLat: loc.latitude,
+      currentLong: loc.longitude,
       companyLat: user.company.latitude,
       companyLong: user.company.longitude,
       radius: user.company.radius,
@@ -588,10 +607,27 @@ bot.on("edited_message", async (ctx) => {
   if (!telegramId) return;
 
   const session = sessions.get(telegramId);
-
   if (!session || session.isInvalid) return;
 
   const loc = msg.location;
+  const extLoc = loc as ExtendedLocation;
+
+  if (!("live_period" in extLoc)) {
+    session.isInvalid = true;
+    sessions.delete(telegramId);
+
+    await prisma.absensi.update({
+      where: { id: session.dbId },
+      data: { status: "INVALID (LIVE MATI)" },
+    });
+
+    return ctx.reply(
+      `❌ <b>VALIDASI GAGAL!</b>\n` +
+        `Live Location dimatikan secara paksa sebelum ${MIN_DURASI_DETIK} detik.\n\n` +
+        `🔄 <b>Silakan ketik /${session.type.toLowerCase()} lagi</b> untuk mengulang.`,
+      { parse_mode: "HTML" },
+    );
+  }
 
   const jarak = getDistance(
     loc.latitude,
@@ -602,7 +638,7 @@ bot.on("edited_message", async (ctx) => {
 
   if (jarak > session.radius) {
     session.isInvalid = true;
-    sessions.set(telegramId, session);
+    sessions.delete(telegramId);
 
     await prisma.absensi.update({
       where: { id: session.dbId },
@@ -611,16 +647,14 @@ bot.on("edited_message", async (ctx) => {
 
     return ctx.reply(
       `⚠️ <b>PERINGATAN: ANDA KELUAR RADIUS KANTOR!</b>\n` +
-        `Jarak Anda saat ini: ${jarak.toFixed(0)}m (Maksimal: ${session.radius}m).\n\n` +
-        `❌ <b>Proses absensi dibatalkan otomatis.</b>\n` +
-        `🔄 <b>Silakan kembali ke dalam area kantor dan ketik /${session.type.toLowerCase()} untuk mengulang absen dari awal.</b>`,
-      {
-        parse_mode: "HTML",
-        reply_parameters: { message_id: msg.message_id },
-      },
+        `Jarak: ${jarak.toFixed(0)}m (Max: ${session.radius}m).\n\n` +
+        `❌ <b>Proses absensi otomatis dibatalkan.</b>`,
+      { parse_mode: "HTML" },
     );
   }
 
+  session.currentLat = loc.latitude;
+  session.currentLong = loc.longitude;
   session.lastUpdate = Date.now();
   sessions.set(telegramId, session);
 });
@@ -635,9 +669,35 @@ setInterval(async () => {
     }
 
     const durasiJalan = now - session.startTime;
-    const durasiDiam = now - session.lastUpdate;
 
-    if (durasiJalan >= MIN_DURASI_MENIT * 60 * 1000) {
+    if (durasiJalan >= MIN_DURASI_DETIK * 1000) {
+      const finalJarak = getDistance(
+        session.currentLat,
+        session.currentLong,
+        session.companyLat,
+        session.companyLong,
+      );
+
+      if (finalJarak > session.radius) {
+        await prisma.absensi.update({
+          where: { id: session.dbId },
+          data: { status: "INVALID (FAKE GPS / LUAR RADIUS)" },
+        });
+
+        bot.telegram
+          .sendMessage(
+            telegramId,
+            `⚠️ <b>PERINGATAN: FAKE GPS / KELUAR RADIUS TERDETEKSI!</b>\n` +
+              `Pada detik terakhir, lokasi Anda berpindah sejauh ${finalJarak.toFixed(0)}m.\n\n` +
+              `❌ <b>Proses absensi otomatis dibatalkan.</b>`,
+            { parse_mode: "HTML" },
+          )
+          .catch(() => {});
+
+        sessions.delete(telegramId);
+        continue;
+      }
+
       await prisma.absensi.update({
         where: { id: session.dbId },
         data: { status: "VALID (VERIFIED)" },
@@ -647,25 +707,8 @@ setInterval(async () => {
         .sendMessage(
           telegramId,
           `✅ <b>VALIDASI SUKSES!</b>\n` +
-            `Terima kasih, lokasi Anda valid selama ${MIN_DURASI_MENIT} menit.\n` +
+            `Terima kasih, lokasi Anda valid.\n` +
             `Data telah tersimpan aman. Anda boleh mematikan Live Location sekarang.`,
-          { parse_mode: "HTML" },
-        )
-        .catch(() => {});
-
-      sessions.delete(telegramId);
-    } else if (durasiDiam > MAX_DIAM_DETIK * 1000) {
-      await prisma.absensi.update({
-        where: { id: session.dbId },
-        data: { status: "INVALID (LIVE MATI)" },
-      });
-
-      bot.telegram
-        .sendMessage(
-          telegramId,
-          `❌ <b>VALIDASI GAGAL!</b>\n` +
-            `Sinyal hilang atau Live Location dimatikan sebelum 15 menit.\n\n` +
-            `🔄 <b>Silakan ketik /${session.type.toLowerCase()} lagi</b> untuk mengulang.`,
           { parse_mode: "HTML" },
         )
         .catch(() => {});
