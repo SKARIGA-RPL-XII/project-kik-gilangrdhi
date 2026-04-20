@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 interface CompanyFormInput {
   nama: string;
   deskripsi?: string;
+  sosmedia?: string;
   alamat: string;
   latitude: string | number;
   longitude: string | number;
@@ -20,6 +21,7 @@ export async function createCompany(data: CompanyFormInput) {
       data: {
         nama: data.nama,
         deskripsi: data.deskripsi,
+        sosmedia: data.sosmedia,
         alamat: data.alamat,
         latitude: parseFloat(data.latitude.toString()),
         longitude: parseFloat(data.longitude.toString()),
@@ -43,6 +45,7 @@ export async function updateCompany(id: number, data: CompanyFormInput) {
       data: {
         nama: data.nama,
         deskripsi: data.deskripsi,
+        sosmedia: data.sosmedia,
         alamat: data.alamat,
         latitude: parseFloat(data.latitude.toString()),
         longitude: parseFloat(data.longitude.toString()),
