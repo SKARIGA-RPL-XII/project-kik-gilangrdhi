@@ -66,7 +66,7 @@ async function main() {
         jam_masuk_kantor: "07:00",
         jam_pulang_kantor: "15:00",
       },
-    });
+    }); 
     createdCompanies.push(c);
   }
   console.log(`🏢 ${createdCompanies.length} Perusahaan dibuat.`);

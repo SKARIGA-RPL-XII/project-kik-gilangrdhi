@@ -11,7 +11,7 @@ model Company {
   id        Int      @id @default(autoincrement())
   nama      String
   deskripsi String?
-  sosmed String?
+  sosmedia String?
   alamat    String?
   latitude  Float
   longitude Float
