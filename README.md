@@ -1,9 +1,10 @@
 # 🤖 Skariga Absenku
 
 <p align="center">
-  <img src="Assets/logo.png" width="120" alt="Skariga Absenku Logo">
+  <img src="Assets/logo.png" height="100" alt="Logo">
+  &nbsp;&nbsp;&nbsp;&nbsp;
+  <img src="Assets/mascot.png" height="100" alt="Mascot">
   <br>
-  <img src="Assets/mascot.png" width="200" alt="Skariga Absenku Mascot">
   <br>
   <b>Sistem Absensi PKL Berbasis Geolocation & Bot Telegram</b>
   <br>
@@ -15,67 +16,58 @@
   <img src="https://img.shields.io/badge/Prisma-ORM-2D3748?style=for-the-badge&logo=prisma" alt="Prisma">
   <img src="https://img.shields.io/badge/Telegraf-Bot-0088cc?style=for-the-badge&logo=telegram" alt="Telegraf">
   <img src="https://img.shields.io/badge/Ant_Design-6-0170FE?style=for-the-badge&logo=ant-design" alt="Ant Design">
-  <img src="https://img.shields.io/badge/Tailwind_CSS-4-38B2AC?style=for-the-badge&logo=tailwind-css" alt="Tailwind">
 </p>
 
 ---
 
 ## 📖 Tentang Project
-**Skariga Absenku** adalah platform manajemen kehadiran dan jurnal harian otomatis untuk siswa PKL. Sistem ini menggunakan **Bot Telegram** sebagai antarmuka utama siswa untuk melakukan absensi berbasis lokasi (*geofencing*) dan pengisian jurnal, sementara **Web Dashboard** digunakan oleh admin/guru untuk monitoring dan rekap data.
+**Skariga Absenku** adalah platform manajemen kehadiran dan jurnal harian otomatis untuk siswa PKL. Sistem ini menggunakan **Bot Telegram** sebagai antarmuka utama siswa untuk melakukan absensi berbasis lokasi (*geofencing*) dan pengisian jurnal, sementara **Web Dashboard** digunakan oleh admin untuk monitoring data.
 
 ### Fitur Utama:
 - **📍 Smart Geofencing:** Validasi lokasi absen berdasarkan radius koordinat perusahaan.
-- **🤖 Bot Telegram:** Fitur `check-in`, `check-out`, dan input jurnal harian langsung lewat Telegram.
-- **📊 Admin Dashboard:** Manajemen data user, perusahaan, dan verifikasi akun pending.
-- **📸 Bukti Jurnal:** Upload foto kegiatan sebagai bukti pengerjaan jurnal harian.
-- **🖨️ PDF Reporting:** Ekspor rekapitulasi absensi ke format PDF secara otomatis.
+- **🤖 Bot Telegram:** Fitur `check-in`, `check-out`, dan input jurnal langsung dari chat.
+- **📊 Admin Dashboard:** Manajemen data user, perusahaan, dan verifikasi akun.
+- **🖨️ PDF Reporting:** Ekspor rekapitulasi absensi ke format PDF otomatis.
 
 ---
 
 ## 🖼️ Dokumentasi Sistem
 
-### 📐 Diagram & Alur
+### 📐 Diagram Arsitektur
 <p align="center">
-  <img src="ERD.png" width="45%" alt="ERD">
-  <img src="DFD-Level-0.png" width="45%" alt="DFD Level 0">
+  <img src="ERD.png" height="250" alt="ERD">
+  &nbsp;&nbsp;
+  <img src="DFD-Level-0.png" height="250" alt="DFD 0">
 </p>
 
-<details>
-<summary><b>Lihat Flowchart Sistem</b></summary>
+### 📱 Preview Bot Telegram
 <p align="center">
-  <b>Flowchart User:</b><br>
-  <img src="FlowchartUser.png" width="80%" alt="Flowchart User">
-  <br><br>
-  <b>Flowchart Admin:</b><br>
-  <img src="FlowchartAdmin.png" width="80%" alt="Flowchart Admin">
-</p>
-</details>
-
-### 📱 Antarmuka Bot Telegram (Result)
-<p align="center">
-  <img src="Result/tele start.jpeg" width="30%" alt="Tele Start">
-  <img src="Result/tele menu.jpeg" width="30%" alt="Tele Menu">
+  <img src="Result/tele start.jpeg" height="350" alt="Tele Start">
+  &nbsp;&nbsp;
+  <img src="Result/tele menu.jpeg" height="350" alt="Tele Menu">
 </p>
 
-### 💻 Dashboard Web (Result)
+### 💻 Preview Dashboard Web
 <p align="center">
-  <img src="Result/halaman dashboard.png" width="48%" alt="Dashboard">
-  <img src="Result/list absensi.png" width="48%" alt="List Absensi">
+  <img src="Result/halaman dashboard.png" height="220" alt="Dashboard">
+  &nbsp;&nbsp;
+  <img src="Result/list absensi.png" height="220" alt="List Absensi">
 </p>
 
 ---
 
 ## 🛠️ Tech Stack
-- **Frontend:** Next.js 16 (App Router), React 19, Ant Design, Tailwind CSS v4
+- **Frontend:** Next.js 16, React 19, Ant Design, Tailwind CSS v4
 - **Backend & Bot:** Node.js, Telegraf API
 - **ORM & Database:** Prisma dengan SQLite
-- **Auth:** NextAuth.js
 
 ---
 
-## 🚀 Cara Menjalankan Project
+## 🚀 Panduan Instalasi (Langkah demi Langkah)
 
-1. **Clone & Masuk ke Folder Source:**
-   ```bash
-   git clone [https://github.com/username/repo-name.git](https://github.com/username/repo-name.git)
-   cd skariga-absenku
+Ikuti langkah-langkah berikut untuk menjalankan project di komputer lokal kamu:
+
+### 1. Persiapan Folder
+Buka terminal dan masuk ke direktori source code utama:
+```bash
+cd skariga-absenku
