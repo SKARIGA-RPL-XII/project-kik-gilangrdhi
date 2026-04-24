@@ -1,11 +1,13 @@
 # 🤖 Skariga Absenku
 
 <p align="center">
-  <img src="public/mascot.png" width="200" alt="Skariga Absenku Mascot">
+  <img src="Assets/logo.png" width="120" alt="Skariga Absenku Logo">
+  <br>
+  <img src="Assets/mascot.png" width="200" alt="Skariga Absenku Mascot">
   <br>
   <b>Sistem Absensi PKL Berbasis Geolocation & Bot Telegram</b>
   <br>
-  <i>SMK PGRI 3 Malang - Rekayasa Perangkat Lunak</i>
+  <i>Project Kreativitas dan Inovasi (KIK) - SMK PGRI 3 Malang</i>
 </p>
 
 <p align="center">
@@ -13,48 +15,67 @@
   <img src="https://img.shields.io/badge/Prisma-ORM-2D3748?style=for-the-badge&logo=prisma" alt="Prisma">
   <img src="https://img.shields.io/badge/Telegraf-Bot-0088cc?style=for-the-badge&logo=telegram" alt="Telegraf">
   <img src="https://img.shields.io/badge/Ant_Design-6-0170FE?style=for-the-badge&logo=ant-design" alt="Ant Design">
+  <img src="https://img.shields.io/badge/Tailwind_CSS-4-38B2AC?style=for-the-badge&logo=tailwind-css" alt="Tailwind">
 </p>
 
 ---
 
 ## 📖 Tentang Project
-**Skariga Absenku** adalah platform manajemen kehadiran dan jurnal kegiatan harian bagi siswa yang menjalankan Praktik Kerja Lapangan (PKL). Project ini memadukan kemudahan interaksi melalui **Bot Telegram** dengan dashboard admin yang komprehensif menggunakan **Next.js**.
+**Skariga Absenku** adalah platform manajemen kehadiran dan jurnal harian otomatis untuk siswa PKL. Sistem ini menggunakan **Bot Telegram** sebagai antarmuka utama siswa untuk melakukan absensi berbasis lokasi (*geofencing*) dan pengisian jurnal, sementara **Web Dashboard** digunakan oleh admin/guru untuk monitoring dan rekap data.
 
 ### Fitur Utama:
-- **📍 Smart Geofencing:** Memvalidasi lokasi absen berdasarkan radius koordinat perusahaan yang sudah ditentukan di database.
-- **🤖 Telegram Interaction:** Siswa melakukan absen masuk, pulang, dan mengisi jurnal langsung dari bot.
-- **📑 Digital Journaling:** Pencatatan kegiatan harian siswa yang terintegrasi dengan sistem persetujuan (*approval*) admin.
-- **📊 Admin Dashboard:** Monitoring kehadiran, manajemen data perusahaan (Company), dan verifikasi akun siswa.
-- **🖨️ PDF Reporting:** Ekspor data absensi ke format PDF menggunakan `jspdf` dan `jspdf-autotable`.
+- **📍 Smart Geofencing:** Validasi lokasi absen berdasarkan radius koordinat perusahaan.
+- **🤖 Bot Telegram:** Fitur `check-in`, `check-out`, dan input jurnal harian langsung lewat Telegram.
+- **📊 Admin Dashboard:** Manajemen data user, perusahaan, dan verifikasi akun pending.
+- **📸 Bukti Jurnal:** Upload foto kegiatan sebagai bukti pengerjaan jurnal harian.
+- **🖨️ PDF Reporting:** Ekspor rekapitulasi absensi ke format PDF secara otomatis.
+
+---
+
+## 🖼️ Dokumentasi Sistem
+
+### 📐 Diagram & Alur
+<p align="center">
+  <img src="ERD.png" width="45%" alt="ERD">
+  <img src="DFD-Level-0.png" width="45%" alt="DFD Level 0">
+</p>
+
+<details>
+<summary><b>Lihat Flowchart Sistem</b></summary>
+<p align="center">
+  <b>Flowchart User:</b><br>
+  <img src="FlowchartUser.png" width="80%" alt="Flowchart User">
+  <br><br>
+  <b>Flowchart Admin:</b><br>
+  <img src="FlowchartAdmin.png" width="80%" alt="Flowchart Admin">
+</p>
+</details>
+
+### 📱 Antarmuka Bot Telegram (Result)
+<p align="center">
+  <img src="Result/tele start.jpeg" width="30%" alt="Tele Start">
+  <img src="Result/tele menu.jpeg" width="30%" alt="Tele Menu">
+</p>
+
+### 💻 Dashboard Web (Result)
+<p align="center">
+  <img src="Result/halaman dashboard.png" width="48%" alt="Dashboard">
+  <img src="Result/list absensi.png" width="48%" alt="List Absensi">
+</p>
 
 ---
 
 ## 🛠️ Tech Stack
-Project ini dibangun menggunakan ekosistem JavaScript modern:
-- **Core:** [Next.js 16](https://nextjs.org/) & [React 19](https://react.dev/)
-- **Bot Engine:** [Telegraf](https://telegrafjs.org/) (Telegram Bot API)
-- **ORM & DB:** [Prisma](https://www.prisma.io/) dengan SQLite
-- **Styling:** [Tailwind CSS v4](https://tailwindcss.com/) & [Ant Design](https://ant.design/)
-- **Auth:** [NextAuth.js](https://next-auth.js.org/)
-
----
-
-## 🏗️ Struktur Database (Prisma Schema)
-Sistem ini menggunakan relasi database yang terstruktur untuk mengelola data operasional PKL:
-
-- **Company:** Menyimpan data lokasi, koordinat (Lat/Long), dan radius aman absensi.
-- **User:** Mengelola data profil siswa yang terikat dengan `telegramId` unik.
-- **Absensi:** Mencatat waktu masuk/pulang beserta titik koordinat saat melakukan aksi.
-- **Jurnal:** Menyimpan laporan aktivitas harian dan status approval.
+- **Frontend:** Next.js 16 (App Router), React 19, Ant Design, Tailwind CSS v4
+- **Backend & Bot:** Node.js, Telegraf API
+- **ORM & Database:** Prisma dengan SQLite
+- **Auth:** NextAuth.js
 
 ---
 
 ## 🚀 Cara Menjalankan Project
 
-### 1. Persiapan Environment
-Buat file `.env` di root project:
-```env
-DATABASE_URL="file:./prisma/dev.db"
-TELEGRAM_BOT_TOKEN="YOUR_BOT_TOKEN"
-NEXTAUTH_SECRET="your_secret_key"
-NEXTAUTH_URL="http://localhost:3000"
+1. **Clone & Masuk ke Folder Source:**
+   ```bash
+   git clone [https://github.com/username/repo-name.git](https://github.com/username/repo-name.git)
+   cd skariga-absenku
